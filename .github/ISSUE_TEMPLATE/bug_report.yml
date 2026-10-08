@@ -1,0 +1,21 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, and expected vs actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python version, necto-sdk version, framework (LangGraph / OpenAI Agents / generic), browser.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Anything that helps — a screenshot of the graph view is worth a thousand words.

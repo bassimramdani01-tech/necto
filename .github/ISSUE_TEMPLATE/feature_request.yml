@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest an idea for necto
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like necto to do?
+      description: Describe the feature and the problem it solves for you.
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Your use case
+      description: What kind of multi-agent system are you running, and how would this help you debug or understand it?
