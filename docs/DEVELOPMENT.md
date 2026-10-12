@@ -43,7 +43,8 @@ It is currently **running on 127.0.0.1:5432** and JSONB is verified working.
 
 ```powershell
 # start
-& "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_ctl.exe" -D "$env:LOCALAPPDATA\Programs\necto-tools\pgdata" -l "$env:LOCALAPPDATA\Programs\necto-tools\pg.log" -o "-p 5432" start
+# start (detached — MUST use this form, see note below)
+Start-Process -FilePath "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_ctl.exe" -ArgumentList @("-D","$env:LOCALAPPDATA\Programs\necto-tools\pgdata","-l","$env:LOCALAPPDATA\Programs\necto-tools\pg.log","start") -WindowStyle Hidden
 
 # stop
 & "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_ctl.exe" -D "$env:LOCALAPPDATA\Programs\necto-tools\pgdata" stop
@@ -51,6 +52,10 @@ It is currently **running on 127.0.0.1:5432** and JSONB is verified working.
 # status
 & "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p 5432
 ```
+
+> ⚠️ **Why the detached form?** Plain `pg_ctl ... start` makes `postgres` inherit your console's output handle,
+> so the shell appears to hang forever and the server dies when that shell closes. `Start-Process` detaches it properly.
+> Give it ~5 seconds to finish crash recovery before connecting.
 
 ### Option B — Docker Desktop (**MANUAL — cannot be automated**)
 
