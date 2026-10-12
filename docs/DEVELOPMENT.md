@@ -1,173 +1,146 @@
 # necto — Development Environment Setup (Windows)
 
-This guide sets up **your machine to develop necto itself** (contributor setup).
-It is *not* the end-user install — end users will run necto via `docker compose up`, documented separately at first release.
-
-Everything below was verified against the winget catalog on this machine on the day it was written.
-**Package versions current as of writing:** git 2.55.0.5 · uv 0.12.23 · Node.js LTS 24.20.0 · Docker Desktop 4.94.0 · GitHub CLI 2.102.0.
+**Status on this machine: ✅ set up.** Everything except Docker Desktop is installed and verified.
 
 ---
 
-## What you'll install
+## 1. What is already installed
 
-| Tool | Purpose | Method | Admin needed |
+Tools were installed **portably into your user profile** (no admin rights) because winget installers
+that need elevation could not complete unattended. They are all on your **user PATH**.
+
+| Tool | Version | Location | PATH |
 |---|---|---|---|
-| git | version control | winget (user scope) | ❌ |
-| uv | Python env + package manager | winget (user scope) | ❌ |
-| Python 3.12 | server/SDK runtime | **via uv** (no separate installer) | ❌ |
-| Node.js LTS | web UI runtime (Phase 3) | winget (user scope) | ❌ |
-| pnpm | JS package manager | npm (global) | ❌ |
-| Docker Desktop | PostgreSQL for the database | winget (machine-wide) | ✅ UAC prompt |
-| GitHub CLI | publishing (optional) | winget (user scope) | ❌ |
-| VS Code extensions | editor ergonomics (recommended) | `code --install-extension` | ❌ |
+| git | 2.55.0.windows.5 | `C:\Program Files\Git\cmd` | ✅ machine PATH |
+| uv | 0.13.0 | `%LOCALAPPDATA%\Programs\necto-tools\uv` | ✅ user PATH |
+| Python | 3.12.15 (uv-managed) | `%APPDATA%\uv\python\cpython-3.12.15-windows-x86_64-none` | via `uv` |
+| Node.js | v24.20.0 | `%LOCALAPPDATA%\Programs\necto-tools\node` | ✅ user PATH |
+| pnpm | 12.11.2 | same as Node | ✅ |
+| GitHub CLI | 2.102.0 | `%LOCALAPPDATA%\Programs\necto-tools\gh` | ✅ |
+| pre-commit | 4.6.2 | `%USERPROFILE%\.local\bin` | ✅ |
+| PostgreSQL | 16.4 (portable stand-in) | `%LOCALAPPDATA%\Programs\necto-tools\pgsql` | not needed on PATH |
+| VS Code | 1.141.0 + 9 extensions | — | ✅ |
 
-> **Note:** Python is deliberately *not* a separate step — `uv` downloads and manages its own CPython 3.12, which is exactly what the project targets.
+> ⚠️ **Open a NEW terminal** to pick up PATH changes. Terminals opened earlier will not see `uv`, `node`, `pnpm`, or `gh`.
 
----
-
-## Before you start
-
-One-time winget hygiene so installs don't stall on source agreements:
-
-```powershell
-winget source update --accept-source-agreements
-```
-
-After **every** install below, close and reopen your terminal so PATH picks up the new tool.
+### VS Code extensions installed
+Python · Pylance · Ruff · ESLint · Prettier · Tailwind CSS IntelliSense · Docker · Even Better TOML · Playwright.
 
 ---
 
-## Step 1 — git
+## 2. Database
 
-```powershell
-winget install --id Git.Git -e --scope user --accept-source-agreements --accept-package-agreements
-git --version
+Connection string — **identical for both options**:
+
+```
+postgresql://necto:necto@127.0.0.1:5432/necto
 ```
 
-Expected: `git version 2.55.x.windows.1` (or newer). User-scope install lands in `%LOCALAPPDATA%\Programs\Git` — no UAC.
+### Option A — portable PostgreSQL 16.4 (already running ✅)
 
-## Step 2 — uv
-
-```powershell
-winget install --id astral-sh.uv -e --scope user --accept-source-agreements --accept-package-agreements
-uv --version
-```
-
-Expected: `uv 0.12.23` (or newer).
-
-## Step 3 — Python 3.12 (via uv)
+A local cluster is initialised at `%LOCALAPPDATA%\Programs\necto-tools\pgdata` with the `necto` database and `necto` user.
+It is currently **running on 127.0.0.1:5432** and JSONB is verified working.
 
 ```powershell
-uv python install 3.12
-uv python list
+# start
+& "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_ctl.exe" -D "$env:LOCALAPPDATA\Programs\necto-tools\pgdata" -l "$env:LOCALAPPDATA\Programs\necto-tools\pg.log" -o "-p 5432" start
+
+# stop
+& "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_ctl.exe" -D "$env:LOCALAPPDATA\Programs\necto-tools\pgdata" stop
+
+# status
+& "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p 5432
 ```
 
-Expected: a `cpython-3.12.*` entry in the list. uv keeps this Python entirely inside your user profile — no admin, no PATH pollution.
+### Option B — Docker Desktop (**MANUAL — cannot be automated**)
 
-## Step 4 — Node.js LTS
+Two hard blockers prevent automating this:
 
-```powershell
-winget install --id OpenJS.NodeJS.LTS -e --scope user --accept-source-agreements --accept-package-agreements
-node --version
-```
+1. **Virtualization is disabled in the BIOS** (`HypervisorPresent: False`) — Docker's WSL2 backend cannot run without it.
+2. **Installation requires administrator elevation** — a UAC prompt must be approved by a human.
 
-Expected: `v24.20.0` (or newer). Reopen your terminal after this.
+#### Exact steps
 
-## Step 5 — pnpm
+**Step B1 — Enable virtualization in BIOS/UEFI.**
+Check first: `Task Manager → Performance → CPU → "Virtualization"`.
+If it says **Enabled**, skip to B2. If **Disabled**:
+1. Reboot the machine.
+2. Press `F2`, `Del`, or `Esc` at the manufacturer splash screen (varies by vendor — Lenovo often `F1`, HP `Esc`/`F10`).
+3. Navigate to `Advanced` → `CPU Configuration` (or `Security` / `Virtualization`).
+4. Set **AMD SVM Mode** (AMD CPUs) or **Intel VT-x / Virtualization Technology** (Intel CPUs) to **Enabled**.
+5. Save & exit (usually `F10`).
+6. Confirm in Task Manager that Virtualization now says **Enabled**.
 
-```powershell
-npm install -g pnpm
-pnpm --version
-```
-
-Expected: a `10.x` version. (User-scope Node installs global packages into your profile, so no admin is needed. Node 24 no longer bundles `corepack` reliably, so `npm -g` is the dependable path.)
-
-## Step 6 — Docker Desktop (the long one, ~20–40 min)
-
-Docker Desktop needs virtualization + WSL2, which this machine does **not** have yet. Do these in order:
-
-**6a. Confirm virtualization is off.** Open Task Manager → Performance → CPU → look for *"Virtualization"*. If it says **Enabled**, skip to 6c.
-
-**6b. Enable it in BIOS.** Reboot → press F2/Del at the manufacturer splash → find **SVM Mode** (AMD) or **Intel VT-x / Virtualization Technology** (Intel), usually under *Advanced → CPU Configuration* → set **Enabled** → save & exit.
-
-**6c. Install WSL2.** Open PowerShell **as Administrator** and run:
-
+**Step B2 — Install WSL2.**
+Open PowerShell **as Administrator** (right-click Start → *Terminal (Admin)*) and run:
 ```powershell
 wsl --install
 ```
+Reboot when prompted.
 
-Reboot when it asks.
-
-**6d. Install Docker Desktop.** ⚠️ This one is machine-wide and **will prompt for admin/UAC** — that's expected, approve it.
-
+**Step B3 — Install Docker Desktop.**
+In an **Administrator** PowerShell:
 ```powershell
 winget install --id Docker.DockerDesktop -e --accept-source-agreements --accept-package-agreements
 ```
+Approve the UAC prompt.
 
-**6e. First launch.** Start Docker Desktop → accept the license → wait for the engine (whale icon turns green). If prompted, ensure **Settings → General → "Use the WSL 2 based engine"** is checked.
+**Step B4 — First launch.**
+Start Docker Desktop → accept the licence → wait for the whale icon to stop animating (engine running).
+If prompted, confirm `Settings → General → "Use the WSL 2 based engine"`.
 
-**6f. Verify.**
-
+**Step B5 — Verify.**
 ```powershell
 docker --version
 docker run --rm hello-world
 ```
 
-Expected: the hello-world message ends with *"This message shows that your installation appears to be working correctly."*
+**Step B6 — Switch necto over.**
+Once Docker is running, tell me. I will start Postgres from `docker-compose.yml` (same credentials, same port)
+and we stop the portable stand-in. **No code changes are needed — the connection string stays identical.**
 
-## Step 7 — GitHub CLI (optional, for the publish phase)
+---
+
+## 3. Known issue: stuck installer processes
+
+An earlier unattended `winget` install of Node.js is stuck waiting on a UAC prompt that was never answered.
+Its `winget.exe` / `msiexec.exe` processes may still linger and cannot be killed without elevation.
+
+**What to do:** if you see a **Windows User Account Control dialog** on screen asking about Node.js or
+Windows Installer, click **No** — Node.js is already installed portably, so you do not need it.
+If no dialog is visible, ignore it; the processes clear on the next reboot and block nothing.
+
+---
+
+## 4. Verification checklist
+
+Open a **new** terminal and run:
 
 ```powershell
-winget install --id GitHub.cli -e --scope user --accept-source-agreements --accept-package-agreements
-gh --version
+git --version          # git version 2.55.0.windows.5
+uv --version           # uv 0.13.0
+node --version         # v24.20.0
+pnpm --version         # 12.11.2
+gh --version           # gh version 2.102.0
+pre-commit --version   # pre-commit 4.6.2
+uv python list         # shows cpython-3.12.15
 ```
 
-## Step 8 — VS Code extensions (recommended)
-
+Database:
 ```powershell
-code --install-extension ms-python.python
-code --install-extension ms-python.vscode-pylance
-code --install-extension charliermarsh.ruff
-code --install-extension dbaeumer.vscode-eslint
-code --install-extension esbenp.prettier-vscode
-code --install-extension bradlc.vscode-tailwindcss
-code --install-extension ms-azuretools.vscode-docker
-code --install-extension tamasfe.even-better-toml
-code --install-extension ms-playwright.playwright
-```
-
-## Step 9 — pre-commit (optional, run later inside the repo)
-
-```powershell
-uv tool install pre-commit
-# then, inside the necto repo:
-pre-commit install
+& "$env:LOCALAPPDATA\Programs\necto-tools\pgsql\bin\pg_isready.exe" -h 127.0.0.1 -p 5432
+# 127.0.0.1:5432 - accepting connections
 ```
 
 ---
 
-## Verification checklist
-
-Paste this into a **fresh** terminal after everything is installed — every line should print a version, no "not recognized" errors:
-
-```powershell
-git --version
-uv --version
-uv python list
-node --version
-pnpm --version
-docker --version
-docker run --rm hello-world
-```
-
----
-
-## Troubleshooting
+## 5. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| winget complains about msstore agreements | `winget source update --accept-source-agreements` |
-| "not recognized as the name of a cmdlet" right after install | Close and reopen the terminal (PATH refresh) |
-| Docker engine won't start | Check virtualization (6b) and that WSL2 backend is enabled (6e) |
-| `pnpm` not found but Node is | You ran pnpm in the pre-install terminal; reopen and re-run `npm install -g pnpm` |
-| `uv python list` shows nothing | Re-run `uv python install 3.12` |
+| `uv`/`node`/`pnpm` "not recognized" | Open a **new** terminal (PATH refresh) |
+| `git` not found in an old terminal | Open a new terminal; git is on the machine PATH |
+| `pnpm` missing | It lives next to Node at `...\necto-tools\node\pnpm.cmd` |
+| Postgres won't start | Check the log: `%LOCALAPPDATA%\Programs\necto-tools\pg.log` |
+| Port 5432 already in use | Stop the other PostgreSQL, or change the port in both places |
+| Docker engine won't start | Confirm virtualization is enabled (B1) and WSL2 is installed (B2) |
