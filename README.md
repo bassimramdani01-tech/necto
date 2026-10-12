@@ -12,6 +12,7 @@ Open-source observability that renders multi-agent AI systems as a **live, explo
 - [PLAN.md](PLAN.md) — step-by-step build plan
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design
 - [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — developer environment setup
 
 ## Quickstart
 
