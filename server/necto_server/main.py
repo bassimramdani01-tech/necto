@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from . import __version__
 from .api.graph import router as graph_router
+from .api.live import router as live_router
 from .api.query import router as query_router
 from .api.runs import router as ingestion_router
 from .db import engine
@@ -13,6 +14,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="necto", version=__version__)
     app.include_router(ingestion_router)
     app.include_router(graph_router)
+    app.include_router(live_router)
     app.include_router(query_router)
 
     @app.get("/")

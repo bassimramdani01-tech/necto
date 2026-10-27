@@ -14,7 +14,7 @@ from ..schemas.events import (
     RunFinishIn,
     RunFinished,
 )
-from ..services import ingestion
+from ..services import ingestion, live
 
 router = APIRouter(prefix="/v1", tags=["ingestion"])
 
@@ -29,7 +29,8 @@ def create_run(body: RunCreate, db: Session = Depends(get_db)) -> RunCreated:
 def append_events(
     run_id: UUID, batch: EventBatch, db: Session = Depends(get_db)
 ) -> EventsAccepted:
-    accepted, last_seq = ingestion.append_events(db, run_id, batch)
+    accepted, last_seq, stored = ingestion.append_events(db, run_id, batch)
+    live.publish_events(run_id, stored)
     return EventsAccepted(accepted=accepted, last_seq=last_seq)
 
 
@@ -38,4 +39,5 @@ def finish_run(
     run_id: UUID, body: RunFinishIn, db: Session = Depends(get_db)
 ) -> RunFinished:
     run = ingestion.finish_run(db, run_id, body)
+    live.publish_finished(run_id, run.status, run.finished_at)
     return RunFinished(id=run.id, status=run.status, finished=True)

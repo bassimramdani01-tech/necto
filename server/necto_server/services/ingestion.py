@@ -174,7 +174,9 @@ def create_run(
     return run
 
 
-def append_events(db: Session, run_id: UUID, batch: EventBatch) -> tuple[int, int]:
+def append_events(
+    db: Session, run_id: UUID, batch: EventBatch
+) -> tuple[int, int, list[dict[str, Any]]]:
     validate_events(batch)
 
     run = db.execute(
@@ -206,24 +208,37 @@ def append_events(db: Session, run_id: UUID, batch: EventBatch) -> tuple[int, in
         select(func.max(Event.seq)).where(Event.run_id == run_id)
     ).scalar() or 0
 
+    stored: list[Event] = []
     for offset, event in enumerate(batch.events, start=1):
-        db.add(
-            Event(
-                run_id=run_id,
-                seq=last_seq + offset,
-                ts=event.ts,
-                type=event.type,
-                from_ref=event.from_ref,
-                to_ref=event.to_ref,
-                payload=prepare_payload(event.payload, store_full),
-            )
+        row = Event(
+            run_id=run_id,
+            seq=last_seq + offset,
+            ts=event.ts,
+            type=event.type,
+            from_ref=event.from_ref,
+            to_ref=event.to_ref,
+            payload=prepare_payload(event.payload, store_full),
         )
+        db.add(row)
+        stored.append(row)
 
     _register_registries(db, batch.events)
 
     accepted = len(batch.events)
     db.commit()
-    return accepted, last_seq + accepted
+
+    published = [
+        {
+            "seq": row.seq,
+            "ts": row.ts.isoformat(),
+            "type": row.type,
+            "from_ref": row.from_ref,
+            "to_ref": row.to_ref,
+            "payload": row.payload,
+        }
+        for row in stored
+    ]
+    return accepted, last_seq + accepted, published
 
 
 def finish_run(db: Session, run_id: UUID, body: RunFinishIn) -> Run:

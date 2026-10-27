@@ -4,7 +4,7 @@
 
 Open-source observability that renders multi-agent AI systems as a **live, explorable network graph** — who called whom, with which model, at what cost, and where the handoffs broke.
 
-**Status: early development.** Architecture and schema are frozen; the server is being built.
+**Status: backend Phase 1 complete.** The ingestion, graph projection, query and live-streaming APIs are working and covered by 39 tests. The SDK and web UI are next.
 
 ## Docs
 
@@ -44,3 +44,39 @@ Then open <http://127.0.0.1:8000/healthz> — expect:
 ```json
 {"status": "ok", "database": "up", "version": "0.1.0"}
 ```
+
+## API (v1)
+
+Served by the FastAPI app in `server/`.
+
+### Ingestion
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/v1/runs` | Create a run |
+| `POST` | `/v1/runs/{id}/events` | Append a batch of events (server assigns `seq`) |
+| `POST` | `/v1/runs/{id}/finish` | Mark a run finished |
+
+### Graph
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/runs/{id}/graph` | Per-run network: nodes + edges |
+| `GET` | `/v1/topology` | Aggregate network across all runs |
+
+### Query
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/v1/runs` | List runs with summaries (`?status=`, `limit`, `offset`) |
+| `GET` | `/v1/runs/{id}` | Run detail |
+| `GET` | `/v1/runs/{id}/events` | Page through events (`?after_seq=`, `limit`) |
+| `GET` | `/v1/stats` | Cost / tokens / latency rollups (`?run_id=`) |
+| `GET` | `/v1/agents` | Agent registry |
+| `GET` | `/v1/models` | Model registry |
+
+### Live
+
+| Protocol | Path | Purpose |
+|---|---|---|
+| `WS` | `/v1/live/runs/{id}` | Stream new events and run-finished notices |
