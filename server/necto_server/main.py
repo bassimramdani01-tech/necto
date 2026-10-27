@@ -3,11 +3,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from . import __version__
+from .api.runs import router as ingestion_router
 from .db import engine
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="necto", version=__version__)
+    app.include_router(ingestion_router)
 
     @app.get("/")
     def root() -> dict:
