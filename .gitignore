@@ -19,6 +19,7 @@ web/dist/
 # Env & secrets
 .env
 .env.*
+!.env.example
 
 # Local database / tools (dev stand-ins, not part of the repo)
 pgdata/
