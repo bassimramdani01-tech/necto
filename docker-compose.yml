@@ -1,0 +1,30 @@
+# necto self-host stack.
+#
+# NOTE: maps Postgres to host port 5432. If you are running the portable
+# development stand-in (docs/DEVELOPMENT.md, Option A), stop it first:
+#   pg_ctl -D %LOCALAPPDATA%/Programs/necto-tools/pgdata stop
+#
+# Usage:
+#   docker compose up -d db
+#   docker compose logs -f db
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: necto-db
+    environment:
+      POSTGRES_USER: necto
+      POSTGRES_PASSWORD: necto
+      POSTGRES_DB: necto
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U necto -d necto"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

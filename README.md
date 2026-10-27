@@ -17,3 +17,30 @@ Open-source observability that renders multi-agent AI systems as a **live, explo
 ## Quickstart
 
 *Coming with the first release.*
+
+## Development
+
+Full setup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+### Database
+
+```bash
+docker compose up -d db
+```
+
+Or run the portable PostgreSQL stand-in described in the development guide.
+
+### Server
+
+```bash
+cd server
+uv sync                      # install dependencies
+uv run alembic upgrade head  # create / upgrade the schema
+uv run uvicorn necto_server.main:app --reload
+```
+
+Then open <http://127.0.0.1:8000/healthz> — expect:
+
+```json
+{"status": "ok", "database": "up", "version": "0.1.0"}
+```
