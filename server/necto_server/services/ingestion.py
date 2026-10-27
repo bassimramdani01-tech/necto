@@ -10,10 +10,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import Event, Run
+from ..models import Agent, Event, Model, Run
 from ..schemas.events import (
     MAX_EVENT_BYTES,
     MAX_SNIPPET_CHARS,
@@ -74,6 +75,85 @@ def validate_events(batch: EventBatch) -> None:
                     for err in exc.errors()
                 ],
             ) from exc
+
+
+def _collect_agents(events) -> list[dict[str, Any]]:
+    """Gather agent refs seen in a batch, with their display metadata."""
+    entries: dict[str, dict[str, Any]] = {}
+    for event in events:
+        payload = event.payload or {}
+        for ref in (event.from_ref, event.to_ref):
+            if not ref or not ref.startswith("agent:"):
+                continue
+            entry = entries.setdefault(
+                ref,
+                {
+                    "ref": ref,
+                    "kind": "agent",
+                    "name": None,
+                    "framework": None,
+                    "first_seen": event.ts,
+                    "last_seen": event.ts,
+                },
+            )
+            entry["last_seen"] = event.ts
+            if event.type == "agent_start" and event.to_ref == ref:
+                entry["name"] = payload.get("name") or entry["name"]
+                entry["framework"] = payload.get("framework") or entry["framework"]
+    return list(entries.values())
+
+
+def _collect_models(events) -> list[dict[str, Any]]:
+    entries: dict[str, dict[str, Any]] = {}
+    for event in events:
+        if event.type != "llm_call" or not event.to_ref:
+            continue
+        if not event.to_ref.startswith("model:"):
+            continue
+        payload = event.payload or {}
+        entry = entries.setdefault(
+            event.to_ref,
+            {
+                "ref": event.to_ref,
+                "provider": None,
+                "name": None,
+                "first_seen": event.ts,
+                "last_seen": event.ts,
+            },
+        )
+        entry["last_seen"] = event.ts
+        entry["provider"] = payload.get("provider") or entry["provider"]
+        entry["name"] = payload.get("model") or entry["name"]
+    return list(entries.values())
+
+
+def _register_registries(db: Session, events) -> None:
+    """Upsert the agents/models registries (docs/ARCHITECTURE.md §5)."""
+    agent_rows = _collect_agents(events)
+    if agent_rows:
+        stmt = pg_insert(Agent).values(agent_rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["ref"],
+            set_={
+                "name": func.coalesce(stmt.excluded.name, Agent.name),
+                "framework": func.coalesce(stmt.excluded.framework, Agent.framework),
+                "last_seen": func.greatest(Agent.last_seen, stmt.excluded.last_seen),
+            },
+        )
+        db.execute(stmt)
+
+    model_rows = _collect_models(events)
+    if model_rows:
+        stmt = pg_insert(Model).values(model_rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["ref"],
+            set_={
+                "provider": func.coalesce(stmt.excluded.provider, Model.provider),
+                "name": func.coalesce(stmt.excluded.name, Model.name),
+                "last_seen": func.greatest(Model.last_seen, stmt.excluded.last_seen),
+            },
+        )
+        db.execute(stmt)
 
 
 def create_run(
@@ -138,6 +218,8 @@ def append_events(db: Session, run_id: UUID, batch: EventBatch) -> tuple[int, in
                 payload=prepare_payload(event.payload, store_full),
             )
         )
+
+    _register_registries(db, batch.events)
 
     accepted = len(batch.events)
     db.commit()
