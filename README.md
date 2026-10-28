@@ -2,13 +2,62 @@
 
 > *necto* — Latin: "I bind, I connect, I join."
 
-Open-source observability that renders multi-agent AI systems as a **live, explorable network graph** — who called whom, with which model, at what cost, and where the handoffs broke.
+**necto draws a map of your AI system.** Point it at an app built from multiple agents, models and tools, and it renders the whole thing as one interactive network graph — so you can see how your AI actually works, instead of piecing it together from logs.
 
 ![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**Status: backend Phase 1 complete and hardened.** Ingestion, graph projection, query and live-streaming APIs work, are performance-tuned, and are covered by **64 tests**. Next up: the Python SDK and the web UI.
+---
+
+## The goal
+
+> **Make it easy for developers to map out their AI architecture — so the problems and workflows inside it become something you can *see*, not something you have to guess.**
+
+Multi-agent systems *are* graphs: one agent hands work to another, calls a model, uses a tool, passes the result back. But we build and debug them like lists — reading logs line by line, holding the wiring in our heads.
+
+necto gives that graph a face. It is a **map of your AI architecture**: agents, models and tools as nodes, and the calls, tool uses and handoffs between them as edges. Click any connection and see what actually travelled over it.
+
+## The problem it solves
+
+Once a system has more than a couple of agents, the important information stops being visible:
+
+- **You can't see the shape of your system.** Which agent calls which? Where does control change hands?
+- **Workflows are invisible.** The path a request takes — agent → model → tool → another agent — only exists in code.
+- **Failures are silent.** A routing agent sends work to the wrong place and nothing tells you until the final answer is wrong.
+- **Cost and time are opaque.** The bill is a single number; it never says *which agent or which model* is burning it.
+- **Every framework hides it differently.** LangGraph, the OpenAI Agents SDK and hand-rolled code each trace their own way — or not at all.
+
+## What necto gives you
+
+- **A live network graph** — agents, models and tools as nodes; calls, tool uses and handoffs as edges.
+- **Click any connection** to see exactly what crossed it: the model, token counts, cost, latency.
+- **Handoffs highlighted.** Control passing from one agent to another is the most common silent failure, so those edges are marked distinctly.
+- **Your whole system, not a single trace.** An aggregate topology across every run, plus per-run detail.
+- **Live streaming.** Watch the graph build itself while your agents work.
+- **Cost, tokens and latency broken down** per agent and per model — so "which agent is expensive?" has an answer.
+
+## Who it's for
+
+Anyone building with more than one agent or model: indie developers prototyping agent pipelines, teams debugging a multi-agent workflow, and curious people who want to see how their favourite agent framework actually behaves.
+
+No framework lock-in is required by design — the schema is neutral and every framework translates into it.
+
+## Where it is today
+
+necto is **early**. The backend is complete and tested; the SDK and the visual UI are the next milestones.
+
+| Piece | Status |
+|---|---|
+| Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
+| Python SDK (auto-instrument your app) | ⬜ next — for now events are posted by hand |
+| Visual graph UI | ⬜ next — today the graph is JSON |
+| LangGraph / OpenAI Agents adapters | ⬜ planned |
+| Self-host via `docker compose` | ⚠️ written, not yet run end-to-end |
+
+Being early means the fastest way to help is to try it, break it, and open an issue.
+
+---
 
 ## Docs
 
@@ -17,7 +66,7 @@ Open-source observability that renders multi-agent AI systems as a **live, explo
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design
 - [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — developer environment setup
-- [docs/HANDOFF.md](docs/HANDOFF.md) — project handoff & status report (read this first)
+- [docs/HANDOFF.md](docs/HANDOFF.md) — project handoff & status report
 
 ## Quickstart
 
