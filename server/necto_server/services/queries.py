@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import Integer, Numeric, case, cast, func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from ..models import Agent, Event, Model, Run
@@ -19,51 +19,47 @@ from ..schemas.query import (
     RunSummary,
     StatsResponse,
 )
+from .aggregates import cost_sum, cost_value, latency_value, tokens_sum, tokens_value
+
+RunCounts = tuple[int, float, int, int]  # event_count, cost_usd, tokens, error_count
 
 
-def _cost_value():
-    return cast(Event.payload["cost_usd"].astext, Numeric(18, 8))
+def _run_event_aggregates(db: Session, run_ids: list[UUID]) -> dict[UUID, RunCounts]:
+    """Aggregate event stats for a bounded set of runs.
 
+    Only the requested runs are summarised, so cost is proportional to the page
+    rather than to the whole events table.
+    """
+    if not run_ids:
+        return {}
 
-def _tokens_value():
-    return func.coalesce(
-        cast(Event.payload["input_tokens"].astext, Integer), 0
-    ) + func.coalesce(cast(Event.payload["output_tokens"].astext, Integer), 0)
-
-
-def _latency_value():
-    return cast(Event.payload["latency_ms"].astext, Integer)
-
-
-def _cost_sum():
-    return func.coalesce(
-        func.sum(case((Event.type == "llm_call", _cost_value()), else_=0)), 0
-    )
-
-
-def _tokens_sum():
-    return func.coalesce(
-        func.sum(case((Event.type == "llm_call", _tokens_value()), else_=0)), 0
-    )
-
-
-def _summary_subquery():
-    return (
+    rows = db.execute(
         select(
-            Event.run_id.label("run_id"),
+            Event.run_id,
             func.count().label("event_count"),
-            _cost_sum().label("cost_usd"),
-            _tokens_sum().label("tokens"),
+            cost_sum().label("cost_usd"),
+            tokens_sum().label("tokens"),
             func.coalesce(
                 func.sum(case((Event.type == "error", 1), else_=0)), 0
             ).label("error_count"),
         )
+        .where(Event.run_id.in_(run_ids))
         .group_by(Event.run_id)
-        .subquery()
-    )
+    ).all()
+
+    return {
+        row.run_id: (
+            int(row.event_count or 0),
+            float(row.cost_usd or 0),
+            int(row.tokens or 0),
+            int(row.error_count or 0),
+        )
+        for row in rows
+    }
 
 
-def _summary(run: Run, event_count, cost_usd, tokens, error_count) -> RunSummary:
+def _summary(run: Run, counts: RunCounts) -> RunSummary:
+    event_count, cost_usd, tokens, error_count = counts
     return RunSummary(
         id=run.id,
         name=run.name,
@@ -72,26 +68,21 @@ def _summary(run: Run, event_count, cost_usd, tokens, error_count) -> RunSummary
         framework=run.framework,
         started_at=run.started_at,
         finished_at=run.finished_at,
-        event_count=int(event_count or 0),
-        cost_usd=float(cost_usd or 0),
-        tokens=int(tokens or 0),
-        error_count=int(error_count or 0),
+        event_count=event_count,
+        cost_usd=cost_usd,
+        tokens=tokens,
+        error_count=error_count,
     )
+
+
+_EMPTY_COUNTS: RunCounts = (0, 0.0, 0, 0)
 
 
 def list_runs(
     db: Session, status: str | None, limit: int, offset: int
 ) -> list[RunSummary]:
-    summary = _summary_subquery()
     stmt = (
-        select(
-            Run,
-            summary.c.event_count,
-            summary.c.cost_usd,
-            summary.c.tokens,
-            summary.c.error_count,
-        )
-        .outerjoin(summary, summary.c.run_id == Run.id)
+        select(Run)
         .order_by(Run.started_at.desc(), Run.id.desc())
         .limit(limit)
         .offset(offset)
@@ -99,31 +90,18 @@ def list_runs(
     if status:
         stmt = stmt.where(Run.status == status)
 
-    rows = db.execute(stmt).all()
-    return [
-        _summary(run, event_count, cost_usd, tokens, error_count)
-        for run, event_count, cost_usd, tokens, error_count in rows
-    ]
+    runs = db.execute(stmt).scalars().all()
+    aggregates = _run_event_aggregates(db, [run.id for run in runs])
+    return [_summary(run, aggregates.get(run.id, _EMPTY_COUNTS)) for run in runs]
 
 
 def get_run(db: Session, run_id: UUID) -> RunDetail | None:
-    summary = _summary_subquery()
-    row = db.execute(
-        select(
-            Run,
-            summary.c.event_count,
-            summary.c.cost_usd,
-            summary.c.tokens,
-            summary.c.error_count,
-        )
-        .outerjoin(summary, summary.c.run_id == Run.id)
-        .where(Run.id == run_id)
-    ).first()
-    if row is None:
+    run = db.get(Run, run_id)
+    if run is None:
         return None
 
-    run, event_count, cost_usd, tokens, error_count = row
-    base = _summary(run, event_count, cost_usd, tokens, error_count)
+    aggregates = _run_event_aggregates(db, [run_id])
+    base = _summary(run, aggregates.get(run_id, _EMPTY_COUNTS))
     return RunDetail(
         **base.model_dump(),
         sdk_version=run.sdk_version,
@@ -177,14 +155,14 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
     totals = db.execute(
         select(
             func.count().label("event_count"),
-            _cost_sum().label("cost_usd"),
-            _tokens_sum().label("tokens"),
+            cost_sum().label("cost_usd"),
+            tokens_sum().label("tokens"),
             func.coalesce(
                 func.sum(case((Event.type == "error", 1), else_=0)), 0
             ).label("error_count"),
             func.count(func.distinct(Event.run_id)).label("run_count"),
             func.avg(
-                case((Event.type == "llm_call", _latency_value()), else_=None)
+                case((Event.type == "llm_call", latency_value()), else_=None)
             ).label("avg_latency"),
         ).where(*filters)
     ).one()
@@ -193,25 +171,25 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
         select(
             Event.to_ref.label("model"),
             func.count().label("calls"),
-            func.coalesce(func.sum(_tokens_value()), 0).label("tokens"),
-            func.coalesce(func.sum(_cost_value()), 0).label("cost_usd"),
-            func.avg(_latency_value()).label("avg_latency_ms"),
+            func.coalesce(func.sum(tokens_value()), 0).label("tokens"),
+            func.coalesce(func.sum(cost_value()), 0).label("cost_usd"),
+            func.avg(latency_value()).label("avg_latency_ms"),
         )
         .where(Event.type == "llm_call", Event.to_ref.is_not(None), *filters)
         .group_by(Event.to_ref)
-        .order_by(func.coalesce(func.sum(_cost_value()), 0).desc())
+        .order_by(func.coalesce(func.sum(cost_value()), 0).desc())
     ).all()
 
     agent_rows = db.execute(
         select(
             Event.from_ref.label("agent"),
             func.count().label("calls"),
-            func.coalesce(func.sum(_tokens_value()), 0).label("tokens"),
-            func.coalesce(func.sum(_cost_value()), 0).label("cost_usd"),
+            func.coalesce(func.sum(tokens_value()), 0).label("tokens"),
+            func.coalesce(func.sum(cost_value()), 0).label("cost_usd"),
         )
         .where(Event.type == "llm_call", Event.from_ref.is_not(None), *filters)
         .group_by(Event.from_ref)
-        .order_by(func.coalesce(func.sum(_cost_value()), 0).desc())
+        .order_by(func.coalesce(func.sum(cost_value()), 0).desc())
     ).all()
 
     type_rows = db.execute(

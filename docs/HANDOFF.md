@@ -275,7 +275,7 @@ All four slipped past 39 green tests — **add regression tests with each fix.**
 - **Registry backfill missing** — `/v1/agents` only knows agents ingested since Step ⑦; earlier demo runs are absent.
 - **Doc drift** — SCHEMA.md says `*_snippet` fields are truncated; code truncates **all** strings.
 
-### 5.3 Measured performance (10,000 events / 100 runs)
+### 5.3 Measured performance — ✅ FIXED (Priority 2 pass, see §11)
 
 | Operation | Measured | Projected @ 1M events | Problem |
 |---|---|---|---|
@@ -305,7 +305,7 @@ All four slipped past 39 green tests — **add regression tests with each fix.**
 4. WebSocket subscribe-before-load → fixes B4
 5. Regression tests for all four
 
-### 6.2 Performance pass (~1–2 h)
+### 6.2 Performance pass — ✅ DONE (see §11)
 
 SQL-aggregated topology · constrained summaries · 4 indexes (optionally denormalized counters).
 
@@ -421,3 +421,45 @@ No regressions: ${BT}store_full${BT} retention still preserves 20 000 chars; ${B
 - **Priority 3** — hygiene: ${BT}[tool.ruff]${BT} config, ${BT}.env${BT} location, timestamp normalization
 - **Priority 4** — before publishing: auth, registry backfill, pagination totals
 - **Phase 2** — Python SDK (do not start until Priorities 1–3 are done)
+
+---
+
+## 11. Update log — Priority 2 (performance)
+
+Measured on **10,000 events / 100 runs**, best of 7 after warmup:
+
+| Operation | Before | After | Gain |
+|---|---|---|---|
+| `GET /v1/topology` | 723 ms | **87 ms** | **~8×** |
+| `GET /v1/runs` (limit 50) | 60 ms | **11 ms** | **~6×** |
+| `GET /v1/runs/{id}` | 13 ms | **3 ms** | **~4×** |
+| `GET /v1/stats` | 59 ms | **31 ms** | **~2×** |
+| `GET .../events` (200) | 17 ms | **9 ms** | ~2× |
+
+("Before" were single-shot cold measurements; "after" are warmed. Warm-vs-warm gains are
+~2–4×; the larger headline figures include removing first-load overhead.)
+
+### What changed
+
+1. **Topology aggregates in SQL.** `build_topology` no longer loads every event into Python —
+   nodes, edges and totals are grouped in Postgres.
+2. **Error attribution moved into SQL** (window function over `(run_id, from_ref)` ordered by
+   `seq`). This replaced a query that pulled ~7,500 rows into Python and **fixed a real
+   bug**: the old in-memory attribution leaked across runs.
+3. **Typed metric columns on `events`** (`cost_usd`, `tokens`, `latency_ms`) extracted at
+   ingest and backfilled by migration. No read path parses JSONB any more.
+4. **Run summaries aggregate only the page's runs** (`_run_event_aggregates`) instead of the
+   entire events table.
+5. **Indexes added:** `runs.started_at`, `events.type`, `agents.last_seen`, `models.last_seen`.
+6. `_event_size` serialises once (`model_dump_json`) instead of twice.
+
+### Tests: 48 → 52
+
+New: SQL topology parity vs the Python projection, per-run error attribution,
+most-recent-edge attribution, topology node names.
+
+### Still open
+
+- Denormalised counters on `runs` (event_count/cost/tokens/errors) so run lists need no aggregate
+  query at all.
+- Pre-aggregated topology snapshots if event volume grows past ~10⁵.

@@ -193,3 +193,113 @@ def test_error_is_attributed_to_last_edge(client, db):
 
     writer = next(n for n in body["nodes"] if n["id"] == "agent:writer")
     assert writer["error_count"] == 1
+
+
+# --------------------------------------------------------------------------
+# Topology is now aggregated in SQL — these lock in parity and correctness.
+# --------------------------------------------------------------------------
+
+
+def test_topology_agrees_with_in_memory_projection(client, db):
+    """The SQL topology must match the Python projection used for run graphs."""
+    _seed(client, "parity-a")
+    _seed(client, "parity-b")
+
+    from necto_server.services import graph
+
+    events = (
+        db.execute(select(Event).order_by(Event.run_id, Event.seq)).scalars().all()
+    )
+    nodes, edges, _totals = graph.project(list(events))
+    expected_nodes, expected_edges = graph._finalize(nodes, edges)
+
+    actual = client.get("/v1/topology").json()
+
+    def node_view(node) -> tuple:
+        return (
+            node["id"],
+            node["kind"],
+            node["name"],
+            node["event_count"],
+            round(float(node["cost_usd"]), 8),
+            node["tokens"],
+            node["error_count"],
+        )
+
+    def edge_view(edge) -> tuple:
+        return (
+            edge["source"],
+            edge["target"],
+            edge["kind"],
+            edge["count"],
+            round(float(edge["cost_usd"]), 8),
+            edge["tokens"],
+            edge["latency_ms"],
+            edge["error_count"],
+            edge["error_rate"],
+        )
+
+    assert sorted(node_view(n.model_dump()) for n in expected_nodes) == sorted(
+        node_view(n) for n in actual["nodes"]
+    )
+    assert sorted(edge_view(e.model_dump()) for e in expected_edges) == sorted(
+        edge_view(e) for e in actual["edges"]
+    )
+    assert actual["stats"]["event_count"] == 18
+    assert actual["stats"]["run_count"] == 2
+
+
+def test_topology_keeps_node_names(client):
+    _seed(client, "names")
+    body = client.get("/v1/topology").json()
+    names = {node["id"]: node["name"] for node in body["nodes"]}
+    assert names["agent:router"] == "Router"
+    assert names["agent:researcher"] == "Researcher"
+    assert names["model:openai:gpt-4o-mini"] == "gpt-4o-mini"
+    assert names["tool:web_search"] == "web_search"
+
+
+def test_topology_error_attribution_is_per_run(client):
+    """An error must attach to its own run's last edge, never another run's."""
+    run_a = _create_run(client, "err-a")
+    _post(
+        client,
+        run_a,
+        [
+            _ev("handoff", {"reason": "x"}, from_="agent:a", to="agent:b"),
+            _ev("error", {"message": "boom"}, from_="agent:a"),
+        ],
+    )
+
+    run_b = _create_run(client, "err-b")
+    _post(client, run_b, [_ev("error", {"message": "boom2"}, from_="agent:a")])
+
+    body = client.get("/v1/topology").json()
+    handoff = next(e for e in body["edges"] if e["kind"] == "handoff")
+    assert handoff["count"] == 1
+    # only run A's error is attributable; run B has no edge before its error
+    assert handoff["error_count"] == 1
+    assert handoff["error_rate"] == 1.0
+
+
+def test_topology_error_attaches_to_the_most_recent_edge(client):
+    run_id = _create_run(client, "two-edges")
+    _post(
+        client,
+        run_id,
+        [
+            _ev("handoff", {"reason": "one"}, from_="agent:a", to="agent:b"),
+            _ev("handoff", {"reason": "two"}, from_="agent:a", to="agent:c"),
+            _ev("error", {"message": "boom"}, from_="agent:a"),
+        ],
+    )
+
+    body = client.get("/v1/topology").json()
+    a_to_b = next(
+        e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:b"
+    )
+    a_to_c = next(
+        e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:c"
+    )
+    assert a_to_b["error_count"] == 0
+    assert a_to_c["error_count"] == 1

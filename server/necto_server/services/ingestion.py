@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -43,8 +42,7 @@ def prepare_payload(payload: dict[str, Any], store_full: bool) -> dict[str, Any]
 
 
 def _event_size(event: Any) -> int:
-    as_dict = event.model_dump(by_alias=True, mode="json")
-    return len(json.dumps(as_dict, ensure_ascii=False).encode("utf-8"))
+    return len(event.model_dump_json(by_alias=True).encode("utf-8"))
 
 
 def validate_events(batch: EventBatch) -> None:
@@ -194,6 +192,34 @@ def create_run(
     return run
 
 
+def _as_float(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _as_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
+
+
+def _event_metrics(
+    event_type: str, payload: dict[str, Any]
+) -> tuple[float | None, int | None, int | None]:
+    """Extract typed metrics so read paths never parse JSONB."""
+    if event_type == "llm_call":
+        tokens_in = _as_int(payload.get("input_tokens"))
+        tokens_out = _as_int(payload.get("output_tokens"))
+        tokens: int | None = None
+        if tokens_in is not None or tokens_out is not None:
+            tokens = (tokens_in or 0) + (tokens_out or 0)
+        return _as_float(payload.get("cost_usd")), tokens, _as_int(payload.get("latency_ms"))
+    if event_type == "tool_result":
+        return None, None, _as_int(payload.get("latency_ms"))
+    return None, None, None
+
+
 def append_events(
     db: Session, run_id: UUID, batch: EventBatch
 ) -> tuple[int, int, list[dict[str, Any]]]:
@@ -245,6 +271,8 @@ def append_events(
 
     stored: list[Event] = []
     for offset, event in enumerate(batch.events, start=1):
+        payload = prepare_payload(event.payload, store_full)
+        cost_usd, tokens, latency_ms = _event_metrics(event.type, event.payload)
         row = Event(
             run_id=run_id,
             seq=last_seq + offset,
@@ -252,7 +280,10 @@ def append_events(
             type=event.type,
             from_ref=event.from_ref,
             to_ref=event.to_ref,
-            payload=prepare_payload(event.payload, store_full),
+            payload=payload,
+            cost_usd=cost_usd,
+            tokens=tokens,
+            latency_ms=latency_ms,
         )
         db.add(row)
         stored.append(row)

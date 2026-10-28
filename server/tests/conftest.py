@@ -41,12 +41,21 @@ def client():
     return TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clean_db():
+@pytest.fixture(scope="session", autouse=True)
+def test_schema():
+    """Rebuild the test schema once per session so it always matches the models."""
     from necto_server import models  # noqa: F401  (register tables)
     from necto_server.db import Base, engine
 
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def clean_db(test_schema):
+    from necto_server.db import engine
+
     with engine.begin() as conn:
         conn.execute(
             text("TRUNCATE TABLE events, runs, agents, models RESTART IDENTITY CASCADE")
