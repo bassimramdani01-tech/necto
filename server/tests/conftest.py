@@ -57,9 +57,7 @@ def clean_db(test_schema):
     from necto_server.db import engine
 
     with engine.begin() as conn:
-        conn.execute(
-            text("TRUNCATE TABLE events, runs, agents, models RESTART IDENTITY CASCADE")
-        )
+        conn.execute(text("TRUNCATE TABLE events, runs, agents, models RESTART IDENTITY CASCADE"))
     yield
 
 

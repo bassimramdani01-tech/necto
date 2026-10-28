@@ -4,7 +4,7 @@
 
 Open-source observability that renders multi-agent AI systems as a **live, explorable network graph** — who called whom, with which model, at what cost, and where the handoffs broke.
 
-**Status: backend Phase 1 complete.** The ingestion, graph projection, query and live-streaming APIs are working and covered by 39 tests. The SDK and web UI are next.
+**Status: backend Phase 1 complete and hardened.** The ingestion, graph projection, query and live-streaming APIs work, are performance-tuned, and are covered by **64 tests**. Next up: the Python SDK and the web UI.
 
 ## Docs
 
@@ -18,6 +18,22 @@ Open-source observability that renders multi-agent AI systems as a **live, explo
 ## Quickstart
 
 *Coming with the first release.*
+
+### Authentication
+
+Auth is **off by default** (local development). Set `NECTO_API_KEY` to require an `X-API-Key`
+header on every `/v1` endpoint, including the live WebSocket:
+
+```bash
+NECTO_API_KEY=my-secret uv run uvicorn necto_server.main:app
+```
+
+`GET /`, `GET /healthz` and `/docs` stay public.
+
+### Pagination
+
+`GET /v1/runs` returns an `X-Total-Count` header with the unpaginated total, so clients can render
+"page 2 of 7".
 
 ## Development
 
@@ -81,3 +97,14 @@ Served by the FastAPI app in `server/`.
 | Protocol | Path | Purpose |
 |---|---|---|
 | `WS` | `/v1/live/runs/{id}` | Stream new events and run-finished notices |
+
+### Backfill agent/model registries
+
+The registries are populated at ingest time. For data written before that existed:
+
+```bash
+cd server
+uv run python scripts/backfill_registries.py
+```
+
+It is idempotent — safe to run repeatedly.

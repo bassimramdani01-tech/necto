@@ -1,8 +1,8 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from necto_server import models  # noqa: F401  (registers tables on Base.metadata)
 from necto_server.config import settings
 from necto_server.db import Base

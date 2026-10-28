@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MAX_EVENTS_PER_BATCH = 1000
 MAX_EVENT_BYTES = 64 * 1024
@@ -26,6 +26,14 @@ class EventIn(BaseModel):
     to_ref: str | None = Field(default=None, alias="to")
     payload: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("ts")
+    @classmethod
+    def _normalise_ts(cls, value: datetime) -> datetime:
+        """Schema §3 says UTC: treat naive timestamps as UTC, convert aware ones."""
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
 
 class EventBatch(BaseModel):
     events: list[EventIn] = Field(min_length=1, max_length=MAX_EVENTS_PER_BATCH)
@@ -38,9 +46,7 @@ class EventBatch(BaseModel):
 
 ALLOWED_REF_KINDS = frozenset({"agent", "tool", "model", "external", "state"})
 
-REF_PATTERN = re.compile(
-    r"^(agent|tool|model|external|state):[A-Za-z0-9][A-Za-z0-9._:-]*$"
-)
+REF_PATTERN = re.compile(r"^(agent|tool|model|external|state):[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
 _AGENT = frozenset({"agent"})
 _MODEL = frozenset({"model"})
@@ -70,9 +76,7 @@ def ref_kind(ref: str) -> str | None:
     return kind if sep else None
 
 
-def validate_refs(
-    event_type: str, from_ref: str | None, to_ref: str | None
-) -> list[str]:
+def validate_refs(event_type: str, from_ref: str | None, to_ref: str | None) -> list[str]:
     """Validate ref grammar plus per-type presence/kind rules.
 
     Returns a list of human-readable problems (empty means valid).
@@ -108,9 +112,7 @@ def validate_refs(
     if to_ref is not None and to_kinds is not None and grammar_ok["to"]:
         kind = ref_kind(to_ref)
         if kind not in to_kinds:
-            problems.append(
-                f"'{event_type}' 'to' must be one of {sorted(to_kinds)}, got {kind!r}"
-            )
+            problems.append(f"'{event_type}' 'to' must be one of {sorted(to_kinds)}, got {kind!r}")
 
     return problems
 

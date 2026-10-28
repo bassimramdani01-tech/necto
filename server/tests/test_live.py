@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
@@ -6,7 +6,7 @@ from fastapi import WebSocketDisconnect
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _ev(type_: str, payload: dict, from_: str | None = None, to: str | None = None) -> dict:
@@ -42,9 +42,7 @@ def test_live_pushes_new_events(client):
         response = client.post(
             f"/v1/runs/{run_id}/events",
             json={
-                "events": [
-                    _ev("handoff", {"reason": "research"}, from_="agent:a", to="agent:b")
-                ]
+                "events": [_ev("handoff", {"reason": "research"}, from_="agent:a", to="agent:b")]
             },
         )
         assert response.status_code == 200, response.text
@@ -70,7 +68,12 @@ def test_live_pushes_a_whole_batch(client):
             json={
                 "events": [
                     _ev("agent_start", {"name": "Planner"}, to="agent:planner"),
-                    _ev("llm_call", {"provider": "openai", "model": "gpt-4o-mini"}, from_="agent:planner", to="model:openai:gpt-4o-mini"),
+                    _ev(
+                        "llm_call",
+                        {"provider": "openai", "model": "gpt-4o-mini"},
+                        from_="agent:planner",
+                        to="model:openai:gpt-4o-mini",
+                    ),
                 ]
             },
         )
@@ -107,9 +110,11 @@ def test_live_hello_reflects_resumed_run(client):
 
 
 def test_live_unknown_run_is_closed(client):
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(f"/v1/live/runs/{UUID(int=0)}") as ws:
-            ws.receive_json()
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect(f"/v1/live/runs/{UUID(int=0)}") as ws,
+    ):
+        ws.receive_json()
 
 
 def test_only_new_events_filters_duplicates():

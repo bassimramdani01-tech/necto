@@ -10,6 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 
+from ..auth import check_api_key
 from ..db import SessionLocal
 from ..models import Event, Run
 from ..services import live
@@ -28,8 +29,7 @@ def _load_run_state(run_id: UUID) -> dict | None:
         if run is None:
             return None
         last_seq = (
-            db.execute(select(func.max(Event.seq)).where(Event.run_id == run_id)).scalar()
-            or 0
+            db.execute(select(func.max(Event.seq)).where(Event.run_id == run_id)).scalar() or 0
         )
         return {"status": run.status, "last_seq": int(last_seq)}
 
@@ -42,17 +42,13 @@ def _only_new_events(message: dict, last_seq: int) -> dict | None:
     """
     if message.get("type") != "events":
         return message
-    fresh = [
-        event for event in message.get("events", []) if event.get("seq", 0) > last_seq
-    ]
+    fresh = [event for event in message.get("events", []) if event.get("seq", 0) > last_seq]
     if not fresh:
         return None
     return {**message, "events": fresh}
 
 
-async def _drain_pending(
-    websocket: WebSocket, queue: asyncio.Queue, last_seq: int
-) -> None:
+async def _drain_pending(websocket: WebSocket, queue: asyncio.Queue, last_seq: int) -> None:
     """Forward whatever arrived between subscribe and hello, minus duplicates."""
     while True:
         try:
@@ -67,6 +63,10 @@ async def _drain_pending(
 @router.websocket("/v1/live/runs/{run_id}")
 async def live_run(websocket: WebSocket, run_id: UUID) -> None:
     await websocket.accept()
+
+    if not check_api_key(websocket.headers.get("x-api-key")):
+        await websocket.close(code=4401, reason="missing or invalid API key")
+        return
 
     # Subscribe BEFORE reading state. Reading last_seq first left a window where
     # events published in between were sent to nobody and silently lost.

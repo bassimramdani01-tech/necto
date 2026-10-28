@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -130,7 +130,7 @@ def _collect_models(events) -> list[dict[str, Any]]:
     return list(entries.values())
 
 
-def _register_registries(db: Session, events) -> None:
+def register_registries(db: Session, events) -> None:
     """Upsert the agents/models registries (docs/ARCHITECTURE.md §5)."""
     agent_rows = _collect_agents(events)
     if agent_rows:
@@ -167,9 +167,7 @@ def _meta_string(meta: dict[str, Any], key: str, limit: int = 64) -> str | None:
     return value[:limit]
 
 
-def create_run(
-    db: Session, name: str | None, meta: dict[str, Any], schema_version: int
-) -> Run:
+def create_run(db: Session, name: str | None, meta: dict[str, Any], schema_version: int) -> Run:
     if schema_version > settings.schema_version:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -225,9 +223,7 @@ def append_events(
 ) -> tuple[int, int, list[dict[str, Any]]]:
     validate_events(batch)
 
-    run = db.execute(
-        select(Run).where(Run.id == run_id).with_for_update()
-    ).scalar_one_or_none()
+    run = db.execute(select(Run).where(Run.id == run_id).with_for_update()).scalar_one_or_none()
     if run is None:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
@@ -265,9 +261,7 @@ def append_events(
     run.framework = framework
     run.sdk_version = sdk_version
 
-    last_seq = db.execute(
-        select(func.max(Event.seq)).where(Event.run_id == run_id)
-    ).scalar() or 0
+    last_seq = db.execute(select(func.max(Event.seq)).where(Event.run_id == run_id)).scalar() or 0
 
     stored: list[Event] = []
     for offset, event in enumerate(batch.events, start=1):
@@ -288,7 +282,7 @@ def append_events(
         db.add(row)
         stored.append(row)
 
-    _register_registries(db, batch.events)
+    register_registries(db, batch.events)
 
     accepted = len(batch.events)
     db.commit()
@@ -308,15 +302,13 @@ def append_events(
 
 
 def finish_run(db: Session, run_id: UUID, body: RunFinishIn) -> Run:
-    run = db.execute(
-        select(Run).where(Run.id == run_id).with_for_update()
-    ).scalar_one_or_none()
+    run = db.execute(select(Run).where(Run.id == run_id).with_for_update()).scalar_one_or_none()
     if run is None:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
 
     run.status = body.status
-    run.finished_at = datetime.now(timezone.utc)
+    run.finished_at = datetime.now(UTC)
 
     meta = dict(run.meta or {})
     if body.output is not None:

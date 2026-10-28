@@ -39,9 +39,9 @@ def _run_event_aggregates(db: Session, run_ids: list[UUID]) -> dict[UUID, RunCou
             func.count().label("event_count"),
             cost_sum().label("cost_usd"),
             tokens_sum().label("tokens"),
-            func.coalesce(
-                func.sum(case((Event.type == "error", 1), else_=0)), 0
-            ).label("error_count"),
+            func.coalesce(func.sum(case((Event.type == "error", 1), else_=0)), 0).label(
+                "error_count"
+            ),
         )
         .where(Event.run_id.in_(run_ids))
         .group_by(Event.run_id)
@@ -78,21 +78,22 @@ def _summary(run: Run, counts: RunCounts) -> RunSummary:
 _EMPTY_COUNTS: RunCounts = (0, 0.0, 0, 0)
 
 
-def list_runs(
-    db: Session, status: str | None, limit: int, offset: int
-) -> list[RunSummary]:
-    stmt = (
-        select(Run)
-        .order_by(Run.started_at.desc(), Run.id.desc())
-        .limit(limit)
-        .offset(offset)
-    )
+def list_runs(db: Session, status: str | None, limit: int, offset: int) -> list[RunSummary]:
+    stmt = select(Run).order_by(Run.started_at.desc(), Run.id.desc()).limit(limit).offset(offset)
     if status:
         stmt = stmt.where(Run.status == status)
 
     runs = db.execute(stmt).scalars().all()
     aggregates = _run_event_aggregates(db, [run.id for run in runs])
     return [_summary(run, aggregates.get(run.id, _EMPTY_COUNTS)) for run in runs]
+
+
+def count_runs(db: Session, status: str | None) -> int:
+    """Total number of runs (before pagination), honouring the status filter."""
+    stmt = select(func.count()).select_from(Run)
+    if status:
+        stmt = stmt.where(Run.status == status)
+    return int(db.execute(stmt).scalar() or 0)
 
 
 def get_run(db: Session, run_id: UUID) -> RunDetail | None:
@@ -109,9 +110,7 @@ def get_run(db: Session, run_id: UUID) -> RunDetail | None:
     )
 
 
-def list_events(
-    db: Session, run_id: UUID, after_seq: int, limit: int
-) -> EventsPage | None:
+def list_events(db: Session, run_id: UUID, after_seq: int, limit: int) -> EventsPage | None:
     if db.get(Run, run_id) is None:
         return None
 
@@ -157,13 +156,13 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
             func.count().label("event_count"),
             cost_sum().label("cost_usd"),
             tokens_sum().label("tokens"),
-            func.coalesce(
-                func.sum(case((Event.type == "error", 1), else_=0)), 0
-            ).label("error_count"),
+            func.coalesce(func.sum(case((Event.type == "error", 1), else_=0)), 0).label(
+                "error_count"
+            ),
             func.count(func.distinct(Event.run_id)).label("run_count"),
-            func.avg(
-                case((Event.type == "llm_call", latency_value()), else_=None)
-            ).label("avg_latency"),
+            func.avg(case((Event.type == "llm_call", latency_value()), else_=None)).label(
+                "avg_latency"
+            ),
         ).where(*filters)
     ).one()
 
@@ -218,9 +217,7 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
                 tokens=int(row.tokens or 0),
                 cost_usd=round(float(row.cost_usd or 0), 8),
                 avg_latency_ms=(
-                    round(float(row.avg_latency_ms), 2)
-                    if row.avg_latency_ms is not None
-                    else None
+                    round(float(row.avg_latency_ms), 2) if row.avg_latency_ms is not None else None
                 ),
             )
             for row in model_rows
@@ -238,11 +235,7 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
 
 
 def list_agents(db: Session, limit: int) -> list[AgentOut]:
-    rows = (
-        db.execute(select(Agent).order_by(Agent.last_seen.desc()).limit(limit))
-        .scalars()
-        .all()
-    )
+    rows = db.execute(select(Agent).order_by(Agent.last_seen.desc()).limit(limit)).scalars().all()
     return [
         AgentOut(
             ref=row.ref,
@@ -257,11 +250,7 @@ def list_agents(db: Session, limit: int) -> list[AgentOut]:
 
 
 def list_models(db: Session, limit: int) -> list[ModelOut]:
-    rows = (
-        db.execute(select(Model).order_by(Model.last_seen.desc()).limit(limit))
-        .scalars()
-        .all()
-    )
+    rows = db.execute(select(Model).order_by(Model.last_seen.desc()).limit(limit)).scalars().all()
     return [
         ModelOut(
             ref=row.ref,

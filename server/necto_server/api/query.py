@@ -2,9 +2,10 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
+from ..auth import require_api_key
 from ..db import get_db
 from ..schemas.query import (
     AgentOut,
@@ -16,16 +17,19 @@ from ..schemas.query import (
 )
 from ..services import queries
 
-router = APIRouter(prefix="/v1", tags=["query"])
+router = APIRouter(prefix="/v1", tags=["query"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/runs", response_model=list[RunSummary])
 def list_runs(
+    response: Response,
     status: str | None = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[RunSummary]:
+    # Total (before pagination) so clients can render "page 2 of 7".
+    response.headers["X-Total-Count"] = str(queries.count_runs(db, status))
     return queries.list_runs(db, status=status, limit=limit, offset=offset)
 
 
@@ -51,9 +55,7 @@ def list_events(
 
 
 @router.get("/stats", response_model=StatsResponse)
-def stats(
-    run_id: UUID | None = None, db: Session = Depends(get_db)
-) -> StatsResponse:
+def stats(run_id: UUID | None = None, db: Session = Depends(get_db)) -> StatsResponse:
     result = queries.build_stats(db, run_id)
     if result is None:
         raise HTTPException(status_code=404, detail="run not found")

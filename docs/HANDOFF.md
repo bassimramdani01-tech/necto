@@ -48,7 +48,7 @@ aggregation fall out for free.
 | Demo data + README GIF | ⬜ Not started | Phase 4 |
 | Docker self-host | ⚠️ Partial | `docker-compose.yml` written, untested (Docker not installed on machine) |
 | CI | ⬜ Not started | Phase 5 |
-| Auth | ⬜ Not started | Intentionally deferred (dev tool) |
+| Auth | ✅ Done | Optional §BT§NECTO_API_KEY§BT§ → §BT§X-API-Key§BT§ on all /v1 endpoints incl. WS |
 
 **Metrics:** 10 commits · 2,006 lines of Python · 39 tests · 4 tables.
 
@@ -463,3 +463,42 @@ most-recent-edge attribution, topology node names.
 - Denormalised counters on `runs` (event_count/cost/tokens/errors) so run lists need no aggregate
   query at all.
 - Pre-aggregated topology snapshots if event volume grows past ~10⁵.
+
+---
+
+## 12. Update log — Priority 3 (hygiene) & Priority 4 (pre-publish)
+
+### Priority 3 — hygiene (DONE)
+
+- **Ruff configured** in `server/pyproject.toml`: `select = [E,F,I,UP,B,SIM]`, `B008` ignored
+  (FastAPI `Depends` in defaults is the documented pattern), line length 100.
+  **41 findings auto-fixed, 17 files formatted, 1 manual fix** → `ruff check` and` ruff format --check` both clean.
+- **`.env` now resolves from either `server/` or the repo root** (`env_file=(".env", "../.env")`). Before,
+  following the docs did nothing.
+- **Timestamps are normalised to UTC** on ingest (naive → UTC, aware → converted), and the DB
+  session runs with `timezone=UTC` so API responses are deterministic regardless of server zone.
+- WebSocket errors are logged rather than swallowed (was already fixed in the Priority 1 pass).
+
+### Priority 4 — pre-publish (DONE)
+
+- **API-key auth** (`necto_server/auth.py`): set `NECTO_API_KEY` to require `X-API-Key` on all
+  `/v1` routes **and** the live WebSocket (`401` / close `4401`). `/`, `/healthz` and `/docs` stay public.
+  Disabled by default for local development; verified live end-to-end.
+- **Registry backfill script** (`server/scripts/backfill_registries.py`): idempotent, re-derives
+  agents/models from existing events. Verified on dev data (26 events → 4 agents, 2 models;
+  `agent:router` gained its previously-missing name).
+- **Pagination totals**: `GET /v1/runs` returns `X-Total-Count` (honours the status filter).
+- **Compose drift tests**: `docker-compose.yml` credentials/image are asserted against the code
+  defaults, so the self-host stack cannot silently diverge. (Docker itself still isn't installed
+  on this machine, so the stack has not been executed end-to-end.)
+
+### Tests: 52 → 64
+
+New: API key (HTTP + WS + public routes), pagination totals, naive-timestamp normalisation,
+compose/config drift.
+
+### Remaining before a public release
+
+- CI (GitHub Actions: ruff + pytest against a Postgres service) — Phase 5.
+- Run `docker compose up` once Docker is available.
+- Phase 2 (SDK) and Phase 3 (web UI) are still unbuilt.

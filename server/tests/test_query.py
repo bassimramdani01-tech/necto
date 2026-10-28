@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -7,7 +7,7 @@ from necto_server.models import Event
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _ev(type_: str, payload: dict, from_: str | None = None, to: str | None = None) -> dict:
@@ -53,7 +53,11 @@ def _seed(client, name: str = "q-run") -> str:
                 to="model:anthropic:claude-sonnet-4",
             ),
             _ev("handoff", {"reason": "sources"}, from_="agent:planner", to="agent:researcher"),
-            _ev("agent_start", {"name": "Researcher", "framework": "langgraph"}, to="agent:researcher"),
+            _ev(
+                "agent_start",
+                {"name": "Researcher", "framework": "langgraph"},
+                to="agent:researcher",
+            ),
             _ev(
                 "llm_call",
                 {
@@ -152,15 +156,11 @@ def test_events_pagination(client):
     assert page1["has_more"] is True
     assert page1["next_after_seq"] == 3
 
-    page2 = client.get(
-        f"/v1/runs/{run_id}/events", params={"after_seq": 3, "limit": 3}
-    ).json()
+    page2 = client.get(f"/v1/runs/{run_id}/events", params={"after_seq": 3, "limit": 3}).json()
     assert [e["seq"] for e in page2["events"]] == [4, 5, 6]
     assert page2["has_more"] is True
 
-    page3 = client.get(
-        f"/v1/runs/{run_id}/events", params={"after_seq": 6, "limit": 3}
-    ).json()
+    page3 = client.get(f"/v1/runs/{run_id}/events", params={"after_seq": 6, "limit": 3}).json()
     assert [e["seq"] for e in page3["events"]] == [7]
     assert page3["has_more"] is False
 
@@ -330,7 +330,7 @@ def test_stats_tolerates_legacy_events_without_refs(client, db):
         Event(
             run_id=run.id,
             seq=1,
-            ts=datetime.now(timezone.utc),
+            ts=datetime.now(UTC),
             type="llm_call",
             from_ref=None,
             to_ref=None,
@@ -345,3 +345,23 @@ def test_stats_tolerates_legacy_events_without_refs(client, db):
     assert body["by_model"] == []
     assert body["by_agent"] == []
     assert body["event_count"] == 1
+
+
+def test_run_list_reports_total_count(client):
+    _seed(client, "count-a")
+    _create_run(client, "count-b")
+
+    response = client.get("/v1/runs", params={"limit": 1})
+    assert response.status_code == 200
+    assert response.headers["X-Total-Count"] == "2"
+    assert len(response.json()) == 1
+
+
+def test_run_list_total_respects_status_filter(client):
+    running = _create_run(client, "still-running")
+    finished = _seed(client, "finished")
+    client.post(f"/v1/runs/{finished}/finish", json={"status": "ok"})
+
+    response = client.get("/v1/runs", params={"status": "running"})
+    assert response.headers["X-Total-Count"] == "1"
+    assert [run["id"] for run in response.json()] == [running]

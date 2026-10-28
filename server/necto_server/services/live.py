@@ -8,6 +8,7 @@ thread-safely via loop.call_soon_threadsafe().
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -48,14 +49,10 @@ class LiveHub:
             return
         except asyncio.QueueFull:
             pass
-        try:
+        with contextlib.suppress(asyncio.QueueEmpty):
             queue.get_nowait()
-        except asyncio.QueueEmpty:
-            return
-        try:
+        with contextlib.suppress(asyncio.QueueFull):
             queue.put_nowait(message)
-        except asyncio.QueueFull:
-            pass
 
     def publish(self, run_id: str, message: dict[str, Any]) -> int:
         """Fan a message out to every subscriber of a run. Returns recipient count."""
@@ -83,9 +80,7 @@ def publish_events(run_id: UUID, events: list[dict[str, Any]]) -> None:
     )
 
 
-def publish_finished(
-    run_id: UUID, status: str, finished_at: datetime | None
-) -> None:
+def publish_finished(run_id: UUID, status: str, finished_at: datetime | None) -> None:
     hub.publish(
         str(run_id),
         {

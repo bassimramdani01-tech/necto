@@ -5,12 +5,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..auth import require_api_key
 from ..db import get_db
 from ..models import Run
 from ..schemas.graph import GraphResponse
 from ..services import graph
 
-router = APIRouter(prefix="/v1", tags=["graph"])
+router = APIRouter(prefix="/v1", tags=["graph"], dependencies=[Depends(require_api_key)])
 
 
 @router.get("/runs/{run_id}/graph", response_model=GraphResponse)

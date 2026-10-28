@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -7,7 +7,7 @@ from necto_server.models import Event
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _ev(type_: str, payload: dict, from_: str | None = None, to: str | None = None) -> dict:
@@ -51,9 +51,7 @@ def test_append_assigns_monotonic_sequence(client, db):
     assert response.json() == {"accepted": 2, "last_seq": 2}
 
     rows = (
-        db.execute(select(Event).where(Event.run_id == run_id).order_by(Event.seq))
-        .scalars()
-        .all()
+        db.execute(select(Event).where(Event.run_id == run_id).order_by(Event.seq)).scalars().all()
     )
     assert [row.seq for row in rows] == [1, 2]
     assert rows[1].from_ref == "agent:router"
@@ -100,11 +98,7 @@ def test_unsupported_schema_version_is_rejected(client):
     run_id = _create_run(client)
     response = client.post(
         f"/v1/runs/{run_id}/events",
-        json={
-            "events": [
-                {"ts": _ts(), "type": "handoff", "schema_version": 999, "payload": {}}
-            ]
-        },
+        json={"events": [{"ts": _ts(), "type": "handoff", "schema_version": 999, "payload": {}}]},
     )
     assert response.status_code == 400
 
@@ -119,9 +113,7 @@ def test_append_to_missing_run_is_404(client):
 
 def test_finish_marks_run_and_blocks_further_events(client, db):
     run_id = _create_run(client)
-    response = client.post(
-        f"/v1/runs/{run_id}/finish", json={"status": "ok", "output": "done"}
-    )
+    response = client.post(f"/v1/runs/{run_id}/finish", json={"status": "ok", "output": "done"})
     assert response.status_code == 200
     assert response.json()["finished"] is True
 
@@ -255,3 +247,28 @@ def test_unknown_event_type_only_gets_grammar_checks(client):
         },
     )
     assert response.status_code == 200, response.text
+
+
+def test_naive_timestamp_is_normalised_to_utc(client):
+    """Schema §3 says UTC: a naive ts is interpreted as UTC, not server-local."""
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={
+            "events": [
+                {
+                    "ts": "2025-01-15T10:00:00",
+                    "type": "handoff",
+                    "schema_version": 1,
+                    "from": "agent:a",
+                    "to": "agent:b",
+                    "payload": {},
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text
+
+    page = client.get(f"/v1/runs/{run_id}/events").json()
+    ts = page["events"][0]["ts"]
+    assert ts.endswith("+00:00") or ts.endswith("Z"), ts

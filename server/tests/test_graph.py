@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -6,7 +6,7 @@ from necto_server.models import Event
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _ev(type_: str, payload: dict, from_: str | None = None, to: str | None = None) -> dict:
@@ -51,9 +51,20 @@ def _seed(client, name: str = "graph-run") -> str:
                 to="model:openai:gpt-4o-mini",
             ),
             _ev("handoff", {"reason": "research"}, from_="agent:router", to="agent:researcher"),
-            _ev("agent_start", {"name": "Researcher", "framework": "langgraph"}, to="agent:researcher"),
-            _ev("tool_call", {"name": "web_search"}, from_="agent:researcher", to="tool:web_search"),
-            _ev("tool_result", {"ok": True, "latency_ms": 1200}, from_="tool:web_search", to="agent:researcher"),
+            _ev(
+                "agent_start",
+                {"name": "Researcher", "framework": "langgraph"},
+                to="agent:researcher",
+            ),
+            _ev(
+                "tool_call", {"name": "web_search"}, from_="agent:researcher", to="tool:web_search"
+            ),
+            _ev(
+                "tool_result",
+                {"ok": True, "latency_ms": 1200},
+                from_="tool:web_search",
+                to="agent:researcher",
+            ),
             _ev(
                 "llm_call",
                 {
@@ -108,7 +119,9 @@ def test_handoff_edge_is_marked_as_handoff(client):
     handoffs = [
         e
         for e in body["edges"]
-        if e["kind"] == "handoff" and e["source"] == "agent:router" and e["target"] == "agent:researcher"
+        if e["kind"] == "handoff"
+        and e["source"] == "agent:router"
+        and e["target"] == "agent:researcher"
     ]
     assert len(handoffs) == 1
     assert handoffs[0]["count"] == 1
@@ -118,9 +131,7 @@ def test_llm_edge_accumulates_cost_and_tokens(client):
     run_id = _seed(client)
     body = client.get(f"/v1/runs/{run_id}/graph").json()
     edge = next(
-        e
-        for e in body["edges"]
-        if e["kind"] == "llm_call" and e["source"] == "agent:researcher"
+        e for e in body["edges"] if e["kind"] == "llm_call" and e["source"] == "agent:researcher"
     )
     assert edge["count"] == 1
     assert edge["tokens"] == 350
@@ -161,9 +172,7 @@ def test_topology_aggregates_across_runs(client):
     assert body["stats"]["run_count"] == 2
 
     handoff = next(
-        e
-        for e in body["edges"]
-        if e["kind"] == "handoff" and e["source"] == "agent:router"
+        e for e in body["edges"] if e["kind"] == "handoff" and e["source"] == "agent:router"
     )
     assert handoff["count"] == 2
     assert body["stats"]["cost_usd"] == 0.006
@@ -207,9 +216,7 @@ def test_topology_agrees_with_in_memory_projection(client, db):
 
     from necto_server.services import graph
 
-    events = (
-        db.execute(select(Event).order_by(Event.run_id, Event.seq)).scalars().all()
-    )
+    events = db.execute(select(Event).order_by(Event.run_id, Event.seq)).scalars().all()
     nodes, edges, _totals = graph.project(list(events))
     expected_nodes, expected_edges = graph._finalize(nodes, edges)
 
@@ -295,11 +302,7 @@ def test_topology_error_attaches_to_the_most_recent_edge(client):
     )
 
     body = client.get("/v1/topology").json()
-    a_to_b = next(
-        e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:b"
-    )
-    a_to_c = next(
-        e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:c"
-    )
+    a_to_b = next(e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:b")
+    a_to_c = next(e for e in body["edges"] if e["source"] == "agent:a" and e["target"] == "agent:c")
     assert a_to_b["error_count"] == 0
     assert a_to_c["error_count"] == 1

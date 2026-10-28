@@ -233,9 +233,7 @@ def _response(
 
 def build_run_graph(db: Session, run_id: UUID) -> GraphResponse:
     events = (
-        db.execute(select(Event).where(Event.run_id == run_id).order_by(Event.seq))
-        .scalars()
-        .all()
+        db.execute(select(Event).where(Event.run_id == run_id).order_by(Event.seq)).scalars().all()
     )
     nodes, edges, totals = project(list(events))
     return _response(
@@ -267,9 +265,9 @@ def _topology_nodes(db: Session) -> dict[str, dict]:
             func.max(Event.ts).label("last_ts"),
             cost_sum().label("cost_usd"),
             tokens_sum().label("tokens"),
-            func.coalesce(
-                func.sum(case((Event.type == "error", 1), else_=0)), 0
-            ).label("error_count"),
+            func.coalesce(func.sum(case((Event.type == "error", 1), else_=0)), 0).label(
+                "error_count"
+            ),
         )
         .where(Event.from_ref.is_not(None))
         .group_by(Event.from_ref)
@@ -337,9 +335,7 @@ def _topology_nodes(db: Session) -> dict[str, dict]:
             node["first_ts"] is None or row.first_ts < node["first_ts"]
         ):
             node["first_ts"] = row.first_ts
-        if row.last_ts is not None and (
-            node["last_ts"] is None or row.last_ts > node["last_ts"]
-        ):
+        if row.last_ts is not None and (node["last_ts"] is None or row.last_ts > node["last_ts"]):
             node["last_ts"] = row.last_ts
         node["name"] = node["name"] or row.name
         node["framework"] = node["framework"] or row.framework
@@ -373,14 +369,12 @@ def _edge_error_counts(db: Session) -> dict[tuple[str, str, str], int]:
         .label("last_edge_seq")
     )
 
-    windowed = (
-        select(
-            Event.run_id.label("run_id"),
-            Event.from_ref.label("from_ref"),
-            Event.type.label("type"),
-            last_edge_seq,
-        ).subquery()
-    )
+    windowed = select(
+        Event.run_id.label("run_id"),
+        Event.from_ref.label("from_ref"),
+        Event.type.label("type"),
+        last_edge_seq,
+    ).subquery()
 
     edge_at = Event.__table__.alias("edge_at")
 
@@ -469,9 +463,9 @@ def build_topology(db: Session) -> GraphResponse:
             func.count(func.distinct(Event.run_id)).label("run_count"),
             cost_sum().label("cost_usd"),
             tokens_sum().label("tokens"),
-            func.coalesce(
-                func.sum(case((Event.type == "error", 1), else_=0)), 0
-            ).label("error_count"),
+            func.coalesce(func.sum(case((Event.type == "error", 1), else_=0)), 0).label(
+                "error_count"
+            ),
         )
     ).one()
 
@@ -485,4 +479,3 @@ def build_topology(db: Session) -> GraphResponse:
         tokens=int(totals.tokens or 0),
         error_count=int(totals.error_count or 0),
     )
-
