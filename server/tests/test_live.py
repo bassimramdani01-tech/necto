@@ -110,3 +110,24 @@ def test_live_unknown_run_is_closed(client):
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect(f"/v1/live/runs/{UUID(int=0)}") as ws:
             ws.receive_json()
+
+
+def test_only_new_events_filters_duplicates():
+    """Unit coverage for the connect-race dedupe helper (fix for lost events)."""
+    from necto_server.api.live import _only_new_events
+
+    message = {
+        "type": "events",
+        "run_id": "r",
+        "events": [{"seq": 1}, {"seq": 2}, {"seq": 3}],
+    }
+    filtered = _only_new_events(message, last_seq=2)
+    assert filtered is not None
+    assert [event["seq"] for event in filtered["events"]] == [3]
+
+    assert _only_new_events(message, last_seq=3) is None
+    assert _only_new_events(message, last_seq=0) == message
+    assert _only_new_events({"type": "run_finished", "status": "ok"}, last_seq=9) == {
+        "type": "run_finished",
+        "status": "ok",
+    }

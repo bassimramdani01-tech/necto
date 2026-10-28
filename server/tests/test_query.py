@@ -274,3 +274,74 @@ def test_registry_is_not_duplicated_across_batches(client):
     writer_entries = [a for a in agents if a["ref"] == "agent:writer"]
     assert len(writer_entries) == 1
     assert writer_entries[0]["name"] == "Writer"
+
+
+# --------------------------------------------------------------------------
+# Run metadata columns (regression: framework/sdk_version were never stored)
+# --------------------------------------------------------------------------
+
+
+def test_run_columns_populated_from_create_meta(client):
+    response = client.post(
+        "/v1/runs",
+        json={
+            "name": "meta-run",
+            "meta": {"framework": "langgraph", "sdk_version": "0.1.0"},
+        },
+    )
+    assert response.status_code == 201, response.text
+    run_id = response.json()["id"]
+
+    detail = client.get(f"/v1/runs/{run_id}").json()
+    assert detail["framework"] == "langgraph"
+    assert detail["sdk_version"] == "0.1.0"
+
+
+def test_run_columns_backfilled_from_run_start_event(client):
+    run_id = client.post("/v1/runs", json={"name": "no-meta"}).json()["id"]
+    _post(
+        client,
+        run_id,
+        [
+            _ev(
+                "run_start",
+                {"input": "go", "meta": {"framework": "crewai", "sdk_version": "2.0.0"}},
+            )
+        ],
+    )
+
+    detail = client.get(f"/v1/runs/{run_id}").json()
+    assert detail["framework"] == "crewai"
+    assert detail["sdk_version"] == "2.0.0"
+    assert detail["meta"]["framework"] == "crewai"
+
+
+# --------------------------------------------------------------------------
+# Stats resilience (regression: events without refs used to 500 /v1/stats)
+# --------------------------------------------------------------------------
+
+
+def test_stats_tolerates_legacy_events_without_refs(client, db):
+    from necto_server.models import Run
+
+    run_id = _create_run(client)
+    run = db.execute(select(Run).where(Run.id == UUID(run_id))).scalars().one()
+    db.add(
+        Event(
+            run_id=run.id,
+            seq=1,
+            ts=datetime.now(timezone.utc),
+            type="llm_call",
+            from_ref=None,
+            to_ref=None,
+            payload={"provider": "openai", "model": "gpt-4o-mini", "cost_usd": 0.5},
+        )
+    )
+    db.commit()
+
+    response = client.get("/v1/stats")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["by_model"] == []
+    assert body["by_agent"] == []
+    assert body["event_count"] == 1

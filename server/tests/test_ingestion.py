@@ -61,7 +61,16 @@ def test_append_assigns_monotonic_sequence(client, db):
 
     follow_up = client.post(
         f"/v1/runs/{run_id}/events",
-        json={"events": [_ev("llm_call", {"provider": "openai", "model": "gpt-4o-mini"})]},
+        json={
+            "events": [
+                _ev(
+                    "llm_call",
+                    {"provider": "openai", "model": "gpt-4o-mini"},
+                    from_="agent:router",
+                    to="model:openai:gpt-4o-mini",
+                )
+            ]
+        },
     )
     assert follow_up.status_code == 200
     assert follow_up.json() == {"accepted": 1, "last_seq": 3}
@@ -82,16 +91,7 @@ def test_invalid_payload_is_rejected(client):
     run_id = _create_run(client)
     response = client.post(
         f"/v1/runs/{run_id}/events",
-        json={
-            "events": [
-                {
-                    "ts": _ts(),
-                    "type": "handoff",
-                    "schema_version": 1,
-                    "payload": {"reason": 12345},
-                }
-            ]
-        },
+        json={"events": [_ev("handoff", {"reason": 12345}, from_="agent:a", to="agent:b")]},
     )
     assert response.status_code == 422
 
@@ -111,7 +111,8 @@ def test_unsupported_schema_version_is_rejected(client):
 
 def test_append_to_missing_run_is_404(client):
     response = client.post(
-        f"/v1/runs/{UUID(int=0)}/events", json={"events": [_ev("handoff", {})]}
+        f"/v1/runs/{UUID(int=0)}/events",
+        json={"events": [_ev("handoff", {"reason": "x"}, from_="agent:a", to="agent:b")]},
     )
     assert response.status_code == 404
 
@@ -132,7 +133,8 @@ def test_finish_marks_run_and_blocks_further_events(client, db):
     assert run.meta["final_output"] == "done"
 
     blocked = client.post(
-        f"/v1/runs/{run_id}/events", json={"events": [_ev("handoff", {})]}
+        f"/v1/runs/{run_id}/events",
+        json={"events": [_ev("handoff", {"reason": "x"}, from_="agent:a", to="agent:b")]},
     )
     assert blocked.status_code == 409
 
@@ -162,3 +164,94 @@ def test_empty_batch_is_rejected(client):
     run_id = _create_run(client)
     response = client.post(f"/v1/runs/{run_id}/events", json={"events": []})
     assert response.status_code == 422
+
+
+# --------------------------------------------------------------------------
+# Reference validation (regression: invalid refs used to reach the graph)
+# --------------------------------------------------------------------------
+
+
+def test_invalid_ref_grammar_is_rejected(client):
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={
+            "events": [
+                {
+                    "ts": _ts(),
+                    "type": "handoff",
+                    "schema_version": 1,
+                    "from": "not-a-ref",
+                    "to": "also bad!!",
+                    "payload": {},
+                }
+            ]
+        },
+    )
+    assert response.status_code == 422, response.text
+    detail = " ".join(response.json()["detail"])
+    assert "invalid 'from' ref" in detail
+    assert "invalid 'to' ref" in detail
+
+
+def test_unknown_ref_kind_is_rejected(client):
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={"events": [_ev("handoff", {}, from_="sprite:ghost", to="agent:b")]},
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_llm_call_requires_to_ref(client):
+    """Regression: this used to be accepted and then crashed /v1/stats."""
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={
+            "events": [
+                {
+                    "ts": _ts(),
+                    "type": "llm_call",
+                    "schema_version": 1,
+                    "from": "agent:a",
+                    "payload": {"provider": "openai", "model": "gpt-4o-mini"},
+                }
+            ]
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert "requires a 'to' ref" in " ".join(response.json()["detail"])
+
+
+def test_llm_call_to_must_be_a_model(client):
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={
+            "events": [
+                _ev(
+                    "llm_call",
+                    {"provider": "openai", "model": "gpt-4o-mini"},
+                    from_="agent:a",
+                    to="tool:web_search",
+                )
+            ]
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert "must be one of" in " ".join(response.json()["detail"])
+
+
+def test_unknown_event_type_only_gets_grammar_checks(client):
+    """Forward compatibility: unknown types may use any valid ref kinds."""
+    run_id = _create_run(client)
+    response = client.post(
+        f"/v1/runs/{run_id}/events",
+        json={
+            "events": [
+                _ev("future_kind", {"anything": 1}, from_="external:user", to="state:memory")
+            ]
+        },
+    )
+    assert response.status_code == 200, response.text

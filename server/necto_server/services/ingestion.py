@@ -21,6 +21,7 @@ from ..schemas.events import (
     PAYLOAD_MODELS,
     EventBatch,
     RunFinishIn,
+    validate_refs,
 )
 
 
@@ -61,6 +62,10 @@ def validate_events(batch: EventBatch) -> None:
                 status_code=413,
                 detail=f"event exceeds the {MAX_EVENT_BYTES} byte limit",
             )
+
+        ref_problems = validate_refs(event.type, event.from_ref, event.to_ref)
+        if ref_problems:
+            raise HTTPException(status_code=422, detail=ref_problems)
 
         model = PAYLOAD_MODELS.get(event.type)
         if model is None:
@@ -156,6 +161,14 @@ def _register_registries(db: Session, events) -> None:
         db.execute(stmt)
 
 
+def _meta_string(meta: dict[str, Any], key: str, limit: int = 64) -> str | None:
+    """Read a short string out of run meta, tolerating wrong types and lengths."""
+    value = meta.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return value[:limit]
+
+
 def create_run(
     db: Session, name: str | None, meta: dict[str, Any], schema_version: int
 ) -> Run:
@@ -167,7 +180,14 @@ def create_run(
                 f"server supports up to {settings.schema_version}"
             ),
         )
-    run = Run(name=name, meta=meta, schema_version=schema_version, status="running")
+    run = Run(
+        name=name,
+        meta=meta,
+        schema_version=schema_version,
+        status="running",
+        framework=_meta_string(meta, "framework"),
+        sdk_version=_meta_string(meta, "sdk_version"),
+    )
     db.add(run)
     db.commit()
     db.refresh(run)
@@ -194,15 +214,30 @@ def append_events(
 
     run_meta = dict(run.meta or {})
     store_full = bool(run_meta.get("store_full"))
+    framework = run.framework
+    sdk_version = run.sdk_version
 
-    # A run_start event may opt the run into full payload retention.
+    # run_start carries the run's identity (framework/sdk version) and can opt
+    # the run into full payload retention.
     for event in batch.events:
+        if event.type != "run_start":
+            continue
         meta = event.payload.get("meta")
-        if event.type == "run_start" and isinstance(meta, dict) and meta.get("store_full"):
+        if not isinstance(meta, dict):
+            continue
+        run_meta.update(meta)
+        if meta.get("store_full"):
             store_full = True
-            run_meta["store_full"] = True
+        if not framework:
+            framework = _meta_string(meta, "framework")
+        if not sdk_version:
+            sdk_version = _meta_string(meta, "sdk_version")
+
     if store_full:
-        run.meta = run_meta
+        run_meta["store_full"] = True
+    run.meta = run_meta
+    run.framework = framework
+    run.sdk_version = sdk_version
 
     last_seq = db.execute(
         select(func.max(Event.seq)).where(Event.run_id == run_id)

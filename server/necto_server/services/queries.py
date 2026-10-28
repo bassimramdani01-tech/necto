@@ -197,7 +197,7 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
             func.coalesce(func.sum(_cost_value()), 0).label("cost_usd"),
             func.avg(_latency_value()).label("avg_latency_ms"),
         )
-        .where(Event.type == "llm_call", *filters)
+        .where(Event.type == "llm_call", Event.to_ref.is_not(None), *filters)
         .group_by(Event.to_ref)
         .order_by(func.coalesce(func.sum(_cost_value()), 0).desc())
     ).all()
@@ -209,7 +209,7 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
             func.coalesce(func.sum(_tokens_value()), 0).label("tokens"),
             func.coalesce(func.sum(_cost_value()), 0).label("cost_usd"),
         )
-        .where(Event.type == "llm_call", *filters)
+        .where(Event.type == "llm_call", Event.from_ref.is_not(None), *filters)
         .group_by(Event.from_ref)
         .order_by(func.coalesce(func.sum(_cost_value()), 0).desc())
     ).all()

@@ -253,7 +253,7 @@ In a **normal user terminal**, `uv run …` should work as documented. If it fai
 
 ## 5. Known issues (from the full audit)
 
-### 5.1 Confirmed bugs — fix before feature work
+### 5.1 Confirmed bugs — ✅ ALL FOUR FIXED (Priority 1 pass, see §10)
 
 | # | Bug | Evidence | Fix |
 |---|---|---|---|
@@ -297,7 +297,7 @@ All four slipped past 39 green tests — **add regression tests with each fix.**
 
 ## 6. What we want to do next
 
-### 6.1 Priority fixes (before new features) — ~1–2 h
+### 6.1 Priority fixes — ✅ DONE (see §10)
 
 1. Ref validation (grammar + kinds + per-type required refs) → fixes B2
 2. Stats tolerates null refs → fixes B1's crash
@@ -387,3 +387,37 @@ API-key auth (all endpoints incl. WS) · registry backfill · pagination totals 
 **Current dev data:** 4 runs · 25 events · 3 agents · 1 model
 
 **Health check:** `GET /healthz` → `{"status":"ok","database":"up","version":"0.1.0"}`
+
+---
+
+## 10. Update log
+
+### Priority 1 — correctness fixes (DONE)
+
+All four confirmed bugs from §5.1 are fixed, each with regression tests. **Test count: 39 → 48.**
+
+| Bug | Fix | Where |
+|---|---|---|
+| **B1** stats 500 on null refs | ${BT}by_model${BT}/${BT}by_agent${BT} exclude rows with NULL refs — legacy/bad rows can no longer 500 the endpoint | ${BT}services/queries.py${BT} |
+| **B2** refs not validated | Strict ${BT}kind:id${BT} grammar, allowed kinds, and per-type presence/kind rules from SCHEMA.md §4–5 → ${BT}422${BT} with precise messages | ${BT}schemas/events.py${BT} + ${BT}services/ingestion.py${BT} |
+| **B3** framework/sdk_version never stored | Populated from create-time meta **and** backfilled from ${BT}run_start${BT} event meta | ${BT}services/ingestion.py${BT} |
+| **B4** live socket connect race | Hub subscribes **before** reading state; events published in the gap are drained after ${BT}hello${BT} with ${BT}seq <= last_seq${BT} duplicates filtered. Socket errors now logged, not swallowed | ${BT}api/live.py${BT} |
+
+**Verified by re-running the original audit probes:**
+
+| Probe | Before | After |
+|---|---|---|
+| ${BT}GET /v1/stats${BT} after malformed event | 500 (ValidationError) | 200 |
+| ${BT}POST${BT} invalid refs (${BT}"not-a-ref"${BT}) | 200 accepted | 422 rejected |
+| ${BT}POST llm_call${BT} without ${BT}to${BT} | 200 accepted | 422 rejected |
+| ${BT}GET /v1/runs/{id}.framework${BT} | null | "langgraph" |
+| Live event during connect window | could be lost | delivered (dedupe unit-tested) |
+
+No regressions: ${BT}store_full${BT} retention still preserves 20 000 chars; ${BT}schema_version${BT} rejection still 400.
+
+### Still open (unchanged)
+
+- **Priority 2** — performance: SQL-aggregated topology, constrained run summaries, 4 indexes (§5.3)
+- **Priority 3** — hygiene: ${BT}[tool.ruff]${BT} config, ${BT}.env${BT} location, timestamp normalization
+- **Priority 4** — before publishing: auth, registry backfill, pagination totals
+- **Phase 2** — Python SDK (do not start until Priorities 1–3 are done)
