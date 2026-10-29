@@ -4,7 +4,7 @@
 
 **necto draws a map of your AI system.** Point it at an app built from multiple agents, models and tools, and it renders the whole thing as one interactive network graph — so you can see how your AI actually works, instead of piecing it together from logs.
 
-![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen)
+![CI](https://github.com/bassimramdani01-tech/necto/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -67,6 +67,10 @@ Being early means the fastest way to help is to try it, break it, and open an is
 - [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — developer environment setup
 - [docs/HANDOFF.md](docs/HANDOFF.md) — project handoff & status report
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for project status, setup, and contribution requirements.
 
 ## Quickstart
 
@@ -194,3 +198,7 @@ NECTO_API_KEY=my-secret uv run uvicorn necto_server.main:app
 
 `GET /v1/runs` returns an `X-Total-Count` header with the unpaginated total, so clients can
 render "page 2 of 7".
+
+## License
+
+MIT — see [LICENSE](LICENSE).

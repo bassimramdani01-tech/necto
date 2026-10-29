@@ -238,7 +238,7 @@ In this machine's sandboxed shell, **uv's venv trampoline `python.exe` hangs / a
 
 ```powershell
 $base = "$env:APPDATA\uv\python\cpython-3.12.15-windows-x86_64-none\python.exe"
-$server = "C:\Users\xxdma\Downloads\necto\server"
+$server = "$env:USERPROFILE\Downloads\necto\server"
 $env:PYTHONPATH = "$server\.venv\Lib\site-packages;$server"
 Set-Location $server
 & $base -m pytest -q
