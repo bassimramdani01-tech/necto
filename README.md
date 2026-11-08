@@ -53,7 +53,7 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Python SDK (auto-instrument your app) | ⬜ next — for now events are posted by hand |
 | Visual graph UI | ⬜ next — today the graph is JSON |
 | LangGraph / OpenAI Agents adapters | ⬜ planned |
-| Self-host via `docker compose` | ⚠️ written, not yet run end-to-end |
+| Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
 
 Being early means the fastest way to help is to try it, break it, and open an issue.
 

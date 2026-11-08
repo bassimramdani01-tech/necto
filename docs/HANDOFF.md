@@ -46,7 +46,7 @@ aggregation fall out for free.
 | **SDK (Python)** | ⬜ Not started | **Phase 2 — the next milestone** |
 | **Web UI** | ⬜ Not started | Phase 3 |
 | Demo data + README GIF | ⬜ Not started | Phase 4 |
-| Docker self-host | ⚠️ Partial | `docker-compose.yml` written, untested (Docker not installed on machine) |
+| Docker self-host | ✅ Verified | `docker compose up -d db` → healthy PostgreSQL 16.15; migrations + 64 tests pass against it |
 | CI | ⬜ Not started | Phase 5 |
 | Auth | ✅ Done | Optional §BT§NECTO_API_KEY§BT§ → §BT§X-API-Key§BT§ on all /v1 endpoints incl. WS |
 
@@ -500,5 +500,4 @@ compose/config drift.
 ### Remaining before a public release
 
 - CI (GitHub Actions: ruff + pytest against a Postgres service) — Phase 5.
-- Run `docker compose up` once Docker is available.
 - Phase 2 (SDK) and Phase 3 (web UI) are still unbuilt.

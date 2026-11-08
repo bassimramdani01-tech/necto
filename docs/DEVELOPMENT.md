@@ -149,3 +149,29 @@ Database:
 | Postgres won't start | Check the log: `%LOCALAPPDATA%\Programs\necto-tools\pg.log` |
 | Port 5432 already in use | Stop the other PostgreSQL, or change the port in both places |
 | Docker engine won't start | Confirm virtualization is enabled (B1) and WSL2 is installed (B2) |
+
+## Network-restricted environments
+
+If Docker Hub is blocked or DNS-poisoned (common on some networks, e.g. `registry-1.docker.io`
+resolving to an unrelated IP), image pulls fail with *"connect: No connection could be made"*.
+Two workarounds:
+
+1. **Configure a registry mirror** — Docker Desktop → Settings → Docker Engine, add:
+
+```json
+{ "registry-mirrors": ["https://docker.m.daocloud.io"] }
+```
+
+   then *Apply & Restart*.
+
+2. **Pull through the mirror host and tag locally** (what was used to verify this repo):
+
+```powershell
+docker pull docker.m.daocloud.io/library/postgres:16-alpine
+docker tag docker.m.daocloud.io/library/postgres:16-alpine postgres:16-alpine
+docker compose up -d db
+```
+
+Also note: the WSL2 kernel installer may need to be fetched from
+`https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi` directly when
+`wsl --install` times out because Microsoft's delivery CDN is unreachable.
