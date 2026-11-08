@@ -501,3 +501,41 @@ compose/config drift.
 
 - CI (GitHub Actions: ruff + pytest against a Postgres service) — Phase 5.
 - Phase 2 (SDK) and Phase 3 (web UI) are still unbuilt.
+
+---
+
+## 13. Update log — Phase 2 (Python SDK), step ⑨
+
+**Environment unblocked first.** WSL2 was installed offline (the network blocks Microsoft's delivery
+CDN, so `wsl --install` times out; the kernel came from
+`wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi` instead). Docker Desktop then
+started and the self-host path was verified end-to-end:
+
+- `docker compose up -d db` → `necto-db` **Up (healthy)**, PostgreSQL 16.15
+- `alembic upgrade head` → all three migrations applied against the container
+- `pytest` → **64 passed** against the container
+- live API against the container → `/healthz` 200, `/v1/runs` 200, `/v1/topology` 200
+
+Docker Hub is DNS-poisoned on this network; images pull through `docker.m.daocloud.io` (documented in
+`docs/DEVELOPMENT.md`).
+
+**Step ⑨ — core tracer (`sdk/`).**
+
+| File | Purpose |
+|---|---|
+| `sdk/necto_sdk/events.py` | schema-v1 event/envelope builders, `kind:id` refs, no deps |
+| `sdk/necto_sdk/transport.py` | `HttpTransport` (stdlib `urllib`), `RecordingTransport`, `NullTransport` |
+| `sdk/necto_sdk/tracer.py` | `Necto` tracer + `Run` handle, batching, background flush |
+| `sdk/tests/` | 14 tests |
+
+Design decisions:
+
+- **Zero runtime dependencies** (stdlib only) so the SDK installs anywhere and cannot conflict with
+  a user's framework versions.
+- **Never crashes the host app**: every transport call is wrapped; failures are logged and dropped.
+- **Buffered**: flushes at `batch_size` (default 64) or every `flush_interval` (default 1 s) on a
+  daemon thread, so instrumentation adds no latency to the agent loop.
+- **No endpoint = no-op**: `Necto()` with nothing configured disables itself instead of failing.
+- `RecordingTransport` lets users test their instrumentation without a server.
+
+**Next:** step ⑩ LangGraph adapter, ⑪ OpenAI Agents SDK adapter, ⑫ generic/OTel bridge.

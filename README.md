@@ -50,7 +50,7 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Piece | Status |
 |---|---|
 | Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK (auto-instrument your app) | ⬜ next — for now events are posted by hand |
+| Python SDK | 🚧 core tracer built · 14 tests · LangGraph / OpenAI Agents adapters next |
 | Visual graph UI | ⬜ next — today the graph is JSON |
 | LangGraph / OpenAI Agents adapters | ⬜ planned |
 | Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
@@ -97,6 +97,34 @@ Interactive API docs: <http://127.0.0.1:8000/docs>
 
 > The Python SDK and the visual UI don't exist yet — for now events are posted by hand.
 
+
+## Python SDK (in progress)
+
+The SDK buffers events, ships them in the background, and **never raises into your app** — if the
+server is down, events are dropped and logged.
+
+```python
+from necto_sdk import Necto
+
+necto = Necto(endpoint="http://127.0.0.1:8000", framework="langgraph")
+
+with necto.run(name="packing-agent") as run:
+    run.agent_start("router", name="Router")
+    run.llm_call("router", "openai", "gpt-4o-mini",
+                 input_tokens=812, output_tokens=95, cost_usd=0.0021)
+    run.handoff("router", "researcher", reason="needs sources")
+    run.tool_call("researcher", "web_search")
+    run.tool_result("web_search", "researcher", ok=True, latency_ms=430)
+```
+
+It is not on PyPI yet — install from the repo:
+
+```bash
+pip install -e sdk/
+```
+
+No framework required: the SDK is a plain tracer. Framework adapters (LangGraph, OpenAI Agents SDK)
+are the next milestone.
 ## Development
 
 Full setup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

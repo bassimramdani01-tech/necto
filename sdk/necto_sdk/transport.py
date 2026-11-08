@@ -1,0 +1,111 @@
+"""Transports for shipping events to a necto server.
+
+The SDK ships with three:
+- HttpTransport      — talks to a running necto server (stdlib only)
+- RecordingTransport — keeps everything in memory (tests / dry runs)
+- NullTransport      — drops everything (necto disabled)
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import urllib.error
+import urllib.request
+from typing import Any, Protocol
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_TIMEOUT = 5.0
+
+
+class Transport(Protocol):
+    def create_run(self, name: str | None, meta: dict[str, Any]) -> str | None: ...
+
+    def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None: ...
+
+    def finish_run(self, run_id: str, status: str, output: str | None) -> None: ...
+
+
+class RecordingTransport:
+    """Keeps every call in memory — useful for tests and dry runs."""
+
+    def __init__(self) -> None:
+        self.runs: list[dict[str, Any]] = []
+        self.events: dict[str, list[dict[str, Any]]] = {}
+        self.finished: list[dict[str, Any]] = []
+
+    def create_run(self, name: str | None, meta: dict[str, Any]) -> str | None:
+        run_id = f"rec-{len(self.runs) + 1}"
+        self.runs.append({"id": run_id, "name": name, "meta": meta})
+        return run_id
+
+    def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
+        self.events.setdefault(run_id, []).extend(events)
+
+    def finish_run(self, run_id: str, status: str, output: str | None) -> None:
+        self.finished.append({"id": run_id, "status": status, "output": output})
+
+    # convenience for assertions
+    def all_events(self) -> list[dict[str, Any]]:
+        return [event for events in self.events.values() for event in events]
+
+
+class NullTransport:
+    """Drops everything. Returns no run id, which makes the tracer a no-op."""
+
+    def create_run(self, name: str | None, meta: dict[str, Any]) -> str | None:
+        return None
+
+    def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
+        return None
+
+    def finish_run(self, run_id: str, status: str, output: str | None) -> None:
+        return None
+
+
+class HttpTransport:
+    """POSTs to a necto server. Never raises: failures are logged and dropped."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        api_key: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> None:
+        self.endpoint = endpoint.rstrip("/")
+        self.api_key = api_key
+        self.timeout = timeout
+
+    def _request(
+        self, method: str, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        request = urllib.request.Request(f"{self.endpoint}{path}", data=data, method=method)
+        request.add_header("Content-Type", "application/json")
+        if self.api_key:
+            request.add_header("X-API-Key", self.api_key)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                raw = response.read()
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as exc:
+            logger.warning("necto: %s %s -> HTTP %s", method, path, exc.code)
+        except Exception as exc:  # noqa: BLE001 - transport must never break the host app
+            logger.warning("necto: %s %s failed: %s", method, path, exc)
+        return None
+
+    def create_run(self, name: str | None, meta: dict[str, Any]) -> str | None:
+        body = {"name": name, "meta": meta}
+        result = self._request("POST", "/v1/runs", body)
+        return result.get("id") if isinstance(result, dict) else None
+
+    def append_events(self, run_id: str, events: list[dict[str, Any]]) -> None:
+        if not run_id:
+            return
+        self._request("POST", f"/v1/runs/{run_id}/events", {"events": events})
+
+    def finish_run(self, run_id: str, status: str, output: str | None) -> None:
+        if not run_id:
+            return
+        self._request("POST", f"/v1/runs/{run_id}/finish", {"status": status, "output": output})
