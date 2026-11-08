@@ -123,3 +123,14 @@ def test_background_flush_delivers_events():
     finally:
         necto.close()
     assert len(transport.all_events()) >= 1
+
+def test_error_accepts_bare_id_or_full_ref():
+    necto, transport = make_tracer()
+    with necto.run() as run:
+        run.error("writer", "boom")
+        run.error("tool:web_search", "tool failed")
+    necto.flush()
+
+    first, second = transport.all_events()
+    assert first["from"] == "agent:writer"
+    assert second["from"] == "tool:web_search"

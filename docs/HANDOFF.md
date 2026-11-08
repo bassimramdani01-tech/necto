@@ -538,4 +538,20 @@ Design decisions:
 - **No endpoint = no-op**: `Necto()` with nothing configured disables itself instead of failing.
 - `RecordingTransport` lets users test their instrumentation without a server.
 
-**Next:** step ⑩ LangGraph adapter, ⑪ OpenAI Agents SDK adapter, ⑫ generic/OTel bridge.
+**Step ⑩ — LangGraph / LangChain adapter (`sdk/necto_sdk/adapters/langgraph.py`).**
+
+- `NectoCallbackHandler` implements the LangChain callback surface (`on_chain_start/end/error`,
+  `on_chat_model_start`, `on_llm_end/error`, `on_tool_start/end/error`) and is **duck-typed** — it
+  never imports langchain or langgraph, so the module is import-safe without them installed.
+- Root chain start creates the necto run; root chain end finishes it. Node chains emit `agent_start`/
+  `agent_finish`; a change of node emits `handoff` (heuristic: LangGraph runs nodes in sequence).
+  Chat models emit `llm_call` with provider, model, tokens (from `llm_output` or
+  `usage_metadata`) and latency; tools emit `tool_call`/`tool_result`.
+- `attach(handler, config)` merges the handler into an existing LangChain config.
+- Every callback is guarded: an adapter bug can never break the user's graph.
+- Verified end-to-end over HTTP against the Docker stack: a simulated 3-node graph produced
+  6 nodes / 6 edges, 2 handoffs, 2 model calls (168 + 420 tokens) and 1 tool round-trip.
+
+**Tests:** 15 → 23 (8 adapter tests).
+
+**Next:** step ⑪ OpenAI Agents SDK adapter, then ⑫ generic/OTel bridge.

@@ -90,7 +90,12 @@ class HttpTransport:
                 raw = response.read()
                 return json.loads(raw) if raw else {}
         except urllib.error.HTTPError as exc:
-            logger.warning("necto: %s %s -> HTTP %s", method, path, exc.code)
+            detail = ""
+            try:
+                detail = exc.read().decode("utf-8", "replace")[:500]
+            except Exception:  # noqa: BLE001
+                detail = "<no body>"
+            logger.warning("necto: %s %s -> HTTP %s: %s", method, path, exc.code, detail)
         except Exception as exc:  # noqa: BLE001 - transport must never break the host app
             logger.warning("necto: %s %s failed: %s", method, path, exc)
         return None

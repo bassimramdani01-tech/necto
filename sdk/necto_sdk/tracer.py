@@ -192,12 +192,15 @@ class Run:
         stack: str | None = None,
         recoverable: bool | None = None,
     ) -> None:
+        """Record an error. `source_id` may be a bare id ('writer') or a full ref
+        ('tool:web_search')."""
         payload: dict[str, Any] = {"message": message}
         if stack is not None:
             payload["stack"] = stack
         if recoverable is not None:
             payload["recoverable"] = recoverable
-        self.emit("error", payload, from_ref=source_id)
+        from_ref = source_id if ":" in source_id else agent_ref(source_id)
+        self.emit("error", payload, from_ref=from_ref)
 
 
 class Necto:
@@ -276,19 +279,29 @@ class Necto:
             self._safe(self._transport.append_events, run_id, events)
 
     # -- public API --------------------------------------------------------
-    @contextmanager
-    def run(self, name: str | None = None, meta: dict[str, Any] | None = None) -> Iterator[Run]:
-        """Start a run, yield a Run handle, and finish it on exit."""
+    def _run_meta(self, meta: dict[str, Any] | None) -> dict[str, Any]:
         run_meta = dict(meta or {})
         if self.framework:
             run_meta.setdefault("framework", self.framework)
         run_meta.setdefault("sdk_version", __import__("necto_sdk").__version__)
+        return run_meta
 
+    def start_run(
+        self, name: str | None = None, meta: dict[str, Any] | None = None
+    ) -> Run:
+        """Create a run and return its handle. Pair with `run.finish()`.
+
+        Use this from integrations that cannot use the `with` form.
+        """
         run_id = None
         if self.enabled:
-            run_id = self._safe(self._transport.create_run, name, run_meta)
+            run_id = self._safe(self._transport.create_run, name, self._run_meta(meta))
+        return Run(self, run_id if isinstance(run_id, str) else None)
 
-        run = Run(self, run_id if isinstance(run_id, str) else None)
+    @contextmanager
+    def run(self, name: str | None = None, meta: dict[str, Any] | None = None) -> Iterator[Run]:
+        """Start a run, yield a Run handle, and finish it on exit."""
+        run = self.start_run(name, meta)
         try:
             yield run
         finally:

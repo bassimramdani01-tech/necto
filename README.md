@@ -50,9 +50,9 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Piece | Status |
 |---|---|
 | Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK | 🚧 core tracer built · 14 tests · LangGraph / OpenAI Agents adapters next |
+| Python SDK | 🚧 core tracer + LangGraph adapter · 23 tests · OpenAI Agents adapter next |
 | Visual graph UI | ⬜ next — today the graph is JSON |
-| LangGraph / OpenAI Agents adapters | ⬜ planned |
+| LangGraph / OpenAI Agents adapters | 🚧 LangGraph done · OpenAI Agents SDK next |
 | Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
 
 Being early means the fastest way to help is to try it, break it, and open an issue.
@@ -116,6 +116,21 @@ with necto.run(name="packing-agent") as run:
     run.tool_call("researcher", "web_search")
     run.tool_result("web_search", "researcher", ok=True, latency_ms=430)
 ```
+
+Already built: a **LangGraph / LangChain adapter**. One line attaches it:
+
+```python
+from necto_sdk import Necto
+from necto_sdk.adapters.langgraph import NectoCallbackHandler
+
+necto = Necto(endpoint="http://127.0.0.1:8000", framework="langgraph")
+handler = NectoCallbackHandler(necto)
+
+graph.invoke(inputs, config={"callbacks": [handler]})
+```
+
+It maps graph nodes to agents, node-to-node transitions to **handoffs**, chat models to `llm_call`
+(with tokens and latency), and tools to `tool_call`/`tool_result` — with no changes to your graph code.
 
 It is not on PyPI yet — install from the repo:
 
