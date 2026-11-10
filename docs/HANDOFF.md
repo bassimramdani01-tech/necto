@@ -598,3 +598,55 @@ All three adapters are duck-typed: `import necto_sdk.adapters.*` never imports t
 Every adapter was verified end-to-end over HTTP against the Docker stack, not just unit-tested.
 
 **Next: Phase 3 — the visual graph UI** (the core product bet).
+
+---
+
+## 14. Pre-Phase-3 audit (full system check)
+
+Ran before starting the UI, to make sure the foundation is trustworthy.
+
+### What was verified
+
+| Area | Result |
+|---|---|
+| Docker self-host | container up + healthy, migrations applied |
+| Server tests | **64 passed** |
+| SDK tests | **51 passed, 1 skipped** |
+| Live API surface | **18/18 checks** (health, create, ingest, validation, reads, finish) |
+| Validation behaviour | bad ref → 422, bad schema_version → 400, empty batch → 422, unknown run → 404 |
+| Live WebSocket (real client) | `hello` → live `events` (seq 1,2) → `run_finished` ✅ |
+| SDK end-to-end | framework + sdk_version stored, state node/edge, graph + stats correct |
+| `store_full` retention | implemented (ingestion.py) |
+| Transport limits | 1000 events / 64 KB / 8 KB snippets — code matches SCHEMA §6 |
+| TODO / FIXME / stubs | none |
+
+### Fixes applied during the audit
+
+1. `.env.example` was missing `NECTO_API_KEY`, even though the README documents it — added
+   (commented out, so local dev stays open by default).
+2. **HTTP retries were never implemented** although PLAN step ⑨ promised "buffer/batch/retry".
+   `HttpTransport` now retries network/5xx failures (`attempts=2`, short backoff) but never retries 4xx,
+   since a validation error cannot be fixed by retrying.
+3. `Run.state_write` hard-coded `state:memory`; it now takes `state_id` (default `"memory"`).
+4. `Necto()` with no endpoint still started a background flusher thread — now it only starts when
+   something can actually be delivered.
+5. SDK version was read via `__import__("necto_sdk").__version__`; moved to `_version.py` as the single
+   source of truth, read by hatch at build time (`[tool.hatch.version]`).
+6. Added the same ruff configuration to the SDK that the server uses.
+
+### Not-a-bug (verified, worth recording)
+
+- `X-Total-Count` **is** returned — an audit script checked it case-sensitively and was wrong.
+- `framework` / `sdk_version` **are** stored from `meta` and from `run_start`; the create response only
+  returns `id`, `status`, `schema_version` (by design).
+- `score` events are accepted by the server even though SCHEMA marks them RESERVED for v2
+  (deliberate leniency: forward-compatible, ignored by projection).
+
+### Environment limitations (not code issues)
+
+| Limit | Effect |
+|---|---|
+| `files.pythonhosted.org` blocked | `ruff` cannot be installed or added to dev deps; lint runs are
+  unavailable locally until the network allows it |
+| `github.com:443` blocked | `git push` must use `ssh.github.com:443` |
+| Docker Hub DNS-poisoned | images pull via `docker.m.daocloud.io` (documented) |

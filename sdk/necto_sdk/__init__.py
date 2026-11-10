@@ -13,11 +13,10 @@ Events are buffered and shipped in the background. The SDK never raises into
 your application: if the necto server is down, events are dropped and logged.
 """
 
+from ._version import __version__
 from .events import agent, event, external, model, ref, state, tool
 from .tracer import Necto, Run
 from .transport import HttpTransport, NullTransport, RecordingTransport
-
-__version__ = "0.1.0"
 
 __all__ = [
     "Necto",

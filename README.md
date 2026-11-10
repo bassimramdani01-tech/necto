@@ -50,7 +50,7 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Piece | Status |
 |---|---|
 | Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK | ✅ core tracer + LangGraph / OpenAI Agents / OpenTelemetry adapters · 42 tests |
+| Python SDK | ✅ core tracer + LangGraph / OpenAI Agents / OpenTelemetry adapters · 51 tests |
 
 | Visual graph UI | ⬜ next — today the graph is JSON |
 | Framework adapters | ✅ LangGraph · OpenAI Agents SDK · OpenTelemetry |

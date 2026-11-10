@@ -1,6 +1,6 @@
 [project]
 name = "necto-sdk"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Instrument multi-agent AI apps and stream their events to a necto server"
 requires-python = ">=3.10"
 dependencies = []
@@ -12,8 +12,19 @@ dev = ["pytest>=8.3.0"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "necto_sdk/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["necto_sdk"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]

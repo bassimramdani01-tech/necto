@@ -7,8 +7,10 @@ import threading
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from ._version import __version__
 from .events import agent as agent_ref
 from .events import model as model_ref
+from .events import state as state_ref
 from .events import tool as tool_ref
 from .events import event as make_event
 from .transport import HttpTransport, NullTransport, Transport
@@ -179,11 +181,19 @@ class Run:
         )
 
     # -- state / errors ----------------------------------------------------
-    def state_write(self, agent_id: str, key: str, value_snippet: str | None = None) -> None:
+    def state_write(
+        self,
+        agent_id: str,
+        key: str,
+        value_snippet: str | None = None,
+        state_id: str = "memory",
+    ) -> None:
         payload: dict[str, Any] = {"key": key}
         if value_snippet is not None:
             payload["value_snippet"] = value_snippet
-        self.emit("state_write", payload, from_ref=agent_ref(agent_id), to_ref="state:memory")
+        self.emit(
+            "state_write", payload, from_ref=agent_ref(agent_id), to_ref=state_ref(state_id)
+        )
 
     def error(
         self,
@@ -234,7 +244,8 @@ class Necto:
         self._buffer: list[tuple[str, dict[str, Any]]] = []
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        if enabled and background:
+        # No point running a flusher when nothing can be delivered.
+        if enabled and background and not isinstance(self._transport, NullTransport):
             self._thread = threading.Thread(
                 target=self._loop, name="necto-flush", daemon=True
             )
@@ -283,7 +294,7 @@ class Necto:
         run_meta = dict(meta or {})
         if self.framework:
             run_meta.setdefault("framework", self.framework)
-        run_meta.setdefault("sdk_version", __import__("necto_sdk").__version__)
+        run_meta.setdefault("sdk_version", __version__)
         return run_meta
 
     def start_run(

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Protocol
@@ -17,6 +18,8 @@ from typing import Any, Protocol
 logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 5.0
+DEFAULT_ATTEMPTS = 2
+DEFAULT_BACKOFF = 0.25
 
 
 class Transport(Protocol):
@@ -72,10 +75,14 @@ class HttpTransport:
         endpoint: str,
         api_key: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
+        attempts: int = DEFAULT_ATTEMPTS,
+        backoff: float = DEFAULT_BACKOFF,
     ) -> None:
         self.endpoint = endpoint.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self.attempts = max(1, int(attempts))
+        self.backoff = max(0.0, float(backoff))
 
     def _request(
         self, method: str, path: str, body: dict[str, Any] | None = None
@@ -85,19 +92,41 @@ class HttpTransport:
         request.add_header("Content-Type", "application/json")
         if self.api_key:
             request.add_header("X-API-Key", self.api_key)
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                raw = response.read()
-                return json.loads(raw) if raw else {}
-        except urllib.error.HTTPError as exc:
-            detail = ""
+
+        for attempt in range(1, self.attempts + 1):
             try:
-                detail = exc.read().decode("utf-8", "replace")[:500]
-            except Exception:  # noqa: BLE001
-                detail = "<no body>"
-            logger.warning("necto: %s %s -> HTTP %s: %s", method, path, exc.code, detail)
-        except Exception as exc:  # noqa: BLE001 - transport must never break the host app
-            logger.warning("necto: %s %s failed: %s", method, path, exc)
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    raw = response.read()
+                    return json.loads(raw) if raw else {}
+            except urllib.error.HTTPError as exc:
+                detail = ""
+                try:
+                    detail = exc.read().decode("utf-8", "replace")[:500]
+                except Exception:  # noqa: BLE001
+                    detail = "<no body>"
+                logger.warning(
+                    "necto: %s %s -> HTTP %s (attempt %s/%s): %s",
+                    method,
+                    path,
+                    exc.code,
+                    attempt,
+                    self.attempts,
+                    detail,
+                )
+                # 4xx means we sent something wrong; retrying cannot help.
+                if 400 <= exc.code < 500:
+                    return None
+            except Exception as exc:  # noqa: BLE001 - transport must never break the host app
+                logger.warning(
+                    "necto: %s %s failed (attempt %s/%s): %s",
+                    method,
+                    path,
+                    attempt,
+                    self.attempts,
+                    exc,
+                )
+            if attempt < self.attempts:
+                time.sleep(self.backoff * attempt)
         return None
 
     def create_run(self, name: str | None, meta: dict[str, Any]) -> str | None:

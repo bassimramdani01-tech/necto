@@ -134,3 +134,30 @@ def test_error_accepts_bare_id_or_full_ref():
     first, second = transport.all_events()
     assert first["from"] == "agent:writer"
     assert second["from"] == "tool:web_search"
+
+def test_state_write_uses_state_ref():
+    necto, transport = make_tracer()
+    with necto.run() as run:
+        run.state_write("planner", "plan", "step 1", state_id="scratch")
+    necto.flush()
+
+    event = transport.all_events()[0]
+    assert event["type"] == "state_write"
+    assert event["from"] == "agent:planner"
+    assert event["to"] == "state:scratch"
+
+
+def test_state_write_defaults_to_memory_state():
+    necto, transport = make_tracer()
+    with necto.run() as run:
+        run.state_write("planner", "plan")
+    necto.flush()
+    assert transport.all_events()[0]["to"] == "state:memory"
+
+
+def test_no_background_thread_when_nothing_can_deliver():
+    necto = Necto()  # no endpoint, no transport -> nothing to flush
+    try:
+        assert necto._thread is None
+    finally:
+        necto.close()
