@@ -17,6 +17,22 @@ export function useRuns(status?: string) {
   });
 }
 
+export function useRun(runId: string | null) {
+  return useQuery({
+    queryKey: ["run", runId],
+    queryFn: () => api.getRun(runId as string),
+    enabled: runId !== null,
+  });
+}
+
+export function useRunGraph(runId: string | null) {
+  return useQuery({
+    queryKey: ["graph", runId],
+    queryFn: () => api.getGraph(runId as string),
+    enabled: runId !== null,
+  });
+}
+
 export function useGlobalStats() {
   return useQuery({
     queryKey: ["stats", "global"],

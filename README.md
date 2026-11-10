@@ -8,6 +8,8 @@
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
+![necto run detail with the interactive architecture graph](docs/assets/graph-view.png)
+
 ---
 
 ## The goal
@@ -224,6 +226,10 @@ pnpm dev        # http://localhost:5173
 
 Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production build:
 `pnpm build` (outputs `web/dist`).
+
+The dashboard lists runs and opens a run detail page with the interactive architecture graph:
+agents in the left column in handoff order, models and tools aligned to the agent that used
+them, weighted edges coloured by call type, and hover labels showing counts.
 ## API (v1)
 
 Served by the FastAPI app in `server/`.

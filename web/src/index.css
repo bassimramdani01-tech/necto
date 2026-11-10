@@ -16,3 +16,37 @@ body {
   background: #020617;
   color: #e2e8f0;
 }
+
+/* React Flow ships a light theme; make its chrome match the app. */
+.react-flow__controls {
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.react-flow__controls-button {
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  color: #cbd5e1;
+}
+
+.react-flow__controls-button:hover {
+  background: #1e293b;
+}
+
+.react-flow__controls-button svg {
+  fill: #cbd5e1;
+}
+
+.react-flow__attribution {
+  background: transparent;
+}
+
+.react-flow__attribution a {
+  color: #475569;
+}
+
+.react-flow__edge-textbg {
+  fill: #0f172a;
+}

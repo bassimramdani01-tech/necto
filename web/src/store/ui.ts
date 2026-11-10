@@ -11,11 +11,31 @@ interface UiState {
   setStatusFilter: (status: string | null) => void;
 }
 
+// Keep the selected run in the URL so a run view can be linked to and reloaded.
+function readRunFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("run");
+}
+
+function writeRunToUrl(runId: string | null): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (runId) {
+    url.searchParams.set("run", runId);
+  } else {
+    url.searchParams.delete("run");
+  }
+  window.history.replaceState({}, "", url);
+}
+
 export const useUiStore = create<UiState>((set) => ({
   view: "runs",
-  selectedRunId: null,
+  selectedRunId: readRunFromUrl(),
   statusFilter: null,
   setView: (view) => set({ view }),
-  selectRun: (selectedRunId) => set({ selectedRunId }),
+  selectRun: (runId) => {
+    writeRunToUrl(runId);
+    set({ selectedRunId: runId });
+  },
   setStatusFilter: (statusFilter) => set({ statusFilter }),
 }));

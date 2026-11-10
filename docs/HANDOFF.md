@@ -688,3 +688,40 @@ tailwindcss 4.3.5, typescript 5.7.3.
 - `@types/node` is required for `process.env` in the Vite config.
 
 **Next:** step ⑭ run detail + step ⑮ the interactive graph (@xyflow/react).
+
+---
+
+## 16. Update log — Phase 3, steps ⑭ + ⑮ (run detail + interactive graph)
+
+**Step ⑭ — run detail.** Clicking a run opens `/` with `?run=<uuid>` (URL-synced, so a run is
+linkable and survives reload). The page shows status, run id, `framework` (+ SDK version), events,
+cost, tokens, errors, duration and relative start time.
+
+**Step ⑮ — the interactive architecture graph** (`@xyflow/react` 12.12.1):
+
+- Custom node per kind, colour-coded: agent (sky), model (violet), tool (amber), state (emerald),
+  external (slate). Each node shows name, kind chip, event count, tokens, cost and error count.
+- Edges styled per event type: handoff (sky, animated), llm_call (violet), tool_call/tool_result
+  (amber), message (slate), state_write (emerald), error (rose), with arrowheads and labels
+  (`kind ×count`).
+- **Layout reads like the workflow**: agents form the left column in **handoff order** (found by
+  walking handoff edges), and every model/tool/state node sits in its kind's column aligned to the
+  row of the agent that first used it. Backward edges attach to opposite handles so they do not loop
+  off-canvas.
+- Dark-themed React Flow controls, background grid, fit-view with padding, legend below.
+
+**Visual verification (new capability):** the UI was rendered with **headless Microsoft Edge**
+(`msedge --headless=new --screenshot --window-size=1440,900 --virtual-time-budget=15s`) and the
+PNGs were inspected. This caught four real defects that unit tests could never see:
+
+1. React Flow's default **white controls strip** on the dark canvas → styled in `index.css`.
+2. An **empty minimap box** overlapped by the attribution badge → minimap removed.
+3. A dependency-depth layout **scattered the graph** (cycles pushed nodes apart) → replaced with the
+   agent-column layout.
+4. Agents were ordered **alphabetically** (researcher before router) → now ordered by handoff chain.
+
+Screenshots committed to `docs/assets/graph-view.png` and `docs/assets/runs-view.png`.
+
+**Build:** `pnpm build` → tsc clean, 113 modules, 474 kB JS / 37 kB CSS (150 kB / 7 kB gzip).
+
+**Next:** step ⑯ live updates + replay scrubber, ⑰ inspector panel, ⑱ stats dashboard.

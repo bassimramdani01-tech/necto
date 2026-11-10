@@ -1,6 +1,7 @@
 import { RecentRuns } from "./components/RecentRuns";
 import { StatusPill } from "./components/StatusPill";
 import { SummaryStrip } from "./components/SummaryStrip";
+import { RunDetailView } from "./views/RunDetailView";
 import { useUiStore, type View } from "./store/ui";
 
 const navItems: { id: View; label: string; ready: boolean }[] = [
@@ -12,6 +13,7 @@ const navItems: { id: View; label: string; ready: boolean }[] = [
 export default function App() {
   const view = useUiStore((state) => state.view);
   const setView = useUiStore((state) => state.setView);
+  const selectedRunId = useUiStore((state) => state.selectedRunId);
 
   return (
     <div className="flex h-full">
@@ -55,17 +57,23 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <header className="border-b border-slate-800 px-8 py-6">
-          <h1 className="text-xl font-semibold text-slate-100">Runs</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Every observed agent run. Click a run to explore its graph.
-          </p>
-        </header>
+        {selectedRunId ? (
+          <RunDetailView runId={selectedRunId} />
+        ) : (
+          <>
+            <header className="border-b border-slate-800 px-8 py-6">
+              <h1 className="text-xl font-semibold text-slate-100">Runs</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Every observed agent run. Click a run to explore its graph.
+              </p>
+            </header>
 
-        <section className="space-y-6 px-8 py-6">
-          <SummaryStrip />
-          <RecentRuns />
-        </section>
+            <section className="space-y-6 px-8 py-6">
+              <SummaryStrip />
+              <RecentRuns />
+            </section>
+          </>
+        )}
       </main>
     </div>
   );
