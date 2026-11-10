@@ -570,4 +570,31 @@ Design decisions:
 
 **Tests:** 23 → 31 (8 OpenAI adapter tests).
 
-**Next:** step ⑫ generic/OTel bridge — closes Phase 2, then Phase 3 (visual graph UI).
+**Step ⑫ — OpenTelemetry bridge (`sdk/necto_sdk/adapters/otel.py`). Phase 2 complete.**
+
+- `NectoSpanProcessor` implements the OTel `SpanProcessor` interface (`on_start`, `on_end`,
+  `shutdown`, `force_flush`); `instrument(necto)` registers it on a `TracerProvider`.
+- Understands the GenAI semantic conventions: `gen_ai.operation.name` of `invoke_agent` /
+  `chat` / `execute_tool` map to `agent_start`+`agent_finish` / `llm_call` (model, tokens,
+  latency from span timestamps) / `tool_call`+`tool_result`. Span status ERROR → `ok=false`.
+  `necto.from` + `necto.to` attributes emit an explicit `handoff`.
+- The run finishes when the **root span** ends; a change of active agent also emits a handoff.
+- Verified end-to-end over HTTP: 5 nodes / 5 edges — handoff triage→booking, gpt-4o-mini
+  (210 tokens / 750 ms), claude-sonnet-4 (620 tokens / 900 ms), tool round-trip (300 ms).
+- Note: `opentelemetry` turned out to be present in the dev venv, so `instrument()` was tightened
+  to raise a clear `RuntimeError` when no SDK `TracerProvider` is configured (the API-level
+  `ProxyTracerProvider` has no `add_span_processor`).
+
+### Phase 2 summary (steps ⑨–⑫) — DONE
+
+| Step | Deliverable | Tests |
+|---|---|---|
+| ⑨ | core tracer: buffered, non-blocking, dependency-free, never raises | 15 |
+| ⑩ | LangGraph / LangChain adapter with handoff inference | +8 (23) |
+| ⑪ | OpenAI Agents SDK adapter | +8 (31) |
+| ⑫ | OpenTelemetry bridge | +11 (42, 1 skipped) |
+
+All three adapters are duck-typed: `import necto_sdk.adapters.*` never imports the framework.
+Every adapter was verified end-to-end over HTTP against the Docker stack, not just unit-tested.
+
+**Next: Phase 3 — the visual graph UI** (the core product bet).

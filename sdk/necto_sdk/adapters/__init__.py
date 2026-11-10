@@ -5,6 +5,16 @@ touched through duck-typed callbacks, never imported at module load.
 """
 
 from .langgraph import NectoCallbackHandler, attach
-from .openai_agents import NectoProcessor, instrument
+from .openai_agents import NectoProcessor
+from .openai_agents import instrument as instrument_openai_agents
+from .otel import NectoSpanProcessor
+from .otel import instrument as instrument_otel
 
-__all__ = ["NectoCallbackHandler", "NectoProcessor", "attach", "instrument"]
+__all__ = [
+    "NectoCallbackHandler",
+    "NectoProcessor",
+    "NectoSpanProcessor",
+    "attach",
+    "instrument_openai_agents",
+    "instrument_otel",
+]

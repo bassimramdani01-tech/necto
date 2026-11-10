@@ -50,10 +50,10 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Piece | Status |
 |---|---|
 | Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK | 🚧 core tracer + LangGraph + OpenAI Agents adapters · 31 tests |
+| Python SDK | ✅ core tracer + LangGraph / OpenAI Agents / OpenTelemetry adapters · 42 tests |
 
 | Visual graph UI | ⬜ next — today the graph is JSON |
-| Framework adapters | ✅ LangGraph + OpenAI Agents SDK |
+| Framework adapters | ✅ LangGraph · OpenAI Agents SDK · OpenTelemetry |
 | Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
 
 Being early means the fastest way to help is to try it, break it, and open an issue.
@@ -99,7 +99,7 @@ Interactive API docs: <http://127.0.0.1:8000/docs>
 > The Python SDK and the visual UI don't exist yet — for now events are posted by hand.
 
 
-## Python SDK (in progress)
+## Python SDK
 
 The SDK buffers events, ships them in the background, and **never raises into your app** — if the
 server is down, events are dropped and logged.
@@ -146,6 +146,15 @@ result = await Runner.run(agent, "hello")
 
 Agent spans become agents, handoff spans become **handoffs**, generation spans become `llm_call`
 (model, tokens, latency), and function spans become `tool_call`/`tool_result`.
+
+Anything that already emits **OpenTelemetry** works through the OTel bridge (GenAI semantic
+conventions, plus `necto.from` / `necto.to` attributes for explicit handoffs):
+
+```python
+from necto_sdk.adapters.otel import instrument
+
+instrument(Necto(endpoint="http://127.0.0.1:8000", framework="otel"))
+```
 
 It is not on PyPI yet — install from the repo:
 
