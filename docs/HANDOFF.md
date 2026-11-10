@@ -650,3 +650,41 @@ Ran before starting the UI, to make sure the foundation is trustworthy.
   unavailable locally until the network allows it |
 | `github.com:443` blocked | `git push` must use `ssh.github.com:443` |
 | Docker Hub DNS-poisoned | images pull via `docker.m.daocloud.io` (documented) |
+
+---
+
+## 15. Update log — Phase 3, step ⑬ (web app shell)
+
+**Stack (per PLAN):** Vite 6 · React 19 · TypeScript 5.7 (strict) · Tailwind 4 · TanStack Query 5 ·
+Zustand 5. Resolved versions: vite 6.4.6, react 19.3.1, @tanstack/react-query 5.107.1, zustand 5.1.0,
+tailwindcss 4.3.5, typescript 5.7.3.
+
+**What exists in `web/`:**
+
+| File | Purpose |
+|---|---|
+| `vite.config.ts` | React + Tailwind plugins; proxy `/v1` (ws), `/healthz`, `/openapi.json` → :8000 |
+| `src/lib/types.ts` | TypeScript mirrors of every server response schema |
+| `src/lib/api.ts` | Typed fetch client; reads `X-Total-Count` for pagination totals |
+| `src/lib/queries.ts` | TanStack Query hooks (health polls every 5 s, runs, global stats, topology) |
+| `src/store/ui.ts` | Zustand store: active view, selected run, status filter |
+| `src/components/*` | StatusPill, Metric, SummaryStrip, RecentRuns |
+| `src/App.tsx` | App shell: sidebar nav + API status + summary metrics + runs table |
+
+**Verified end-to-end (dev server against the live API):**
+
+- `pnpm build` → tsc clean, 85 modules, `dist` 272 kB JS / 17.8 kB CSS
+- HTML served with title + root div + React refresh
+- `/healthz` proxied → `{status: ok, database: up, version: 0.1.0}`
+- `/v1/runs`, `/v1/topology` (14 nodes), `/v1/stats` (11 runs / 67 events) proxied
+- `POST /v1/runs` through the proxy works
+- **WebSocket** `ws://localhost:5173/v1/live/runs/{id}` upgrades through Vite and returns `hello`
+
+**Setup notes:**
+
+- pnpm 12 blocks dependency build scripts; `web/.npmrc` allows `esbuild` via
+  `only-built-dependencies[]=esbuild` (without this, Vite cannot start).
+- Vite binds to `localhost` (IPv6-first on Windows) — use `http://localhost:5173`, not 127.0.0.1.
+- `@types/node` is required for `process.env` in the Vite config.
+
+**Next:** step ⑭ run detail + step ⑮ the interactive graph (@xyflow/react).

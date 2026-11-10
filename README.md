@@ -210,6 +210,20 @@ uv run python scripts/backfill_registries.py
 
 It is idempotent — safe to run repeatedly.
 
+### Web UI
+
+The dashboard lives in `web/` (Vite + React 19 + TypeScript + Tailwind 4, TanStack Query,
+Zustand). In development it proxies `/v1` and `/healthz` to the API on port 8000, including the
+live WebSocket upgrade.
+
+```bash
+cd web
+pnpm install
+pnpm dev        # http://localhost:5173
+```
+
+Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production build:
+`pnpm build` (outputs `web/dist`).
 ## API (v1)
 
 Served by the FastAPI app in `server/`.
