@@ -50,9 +50,10 @@ necto is **early**. The backend is complete and tested; the SDK and the visual U
 | Piece | Status |
 |---|---|
 | Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK | 🚧 core tracer + LangGraph adapter · 23 tests · OpenAI Agents adapter next |
+| Python SDK | 🚧 core tracer + LangGraph + OpenAI Agents adapters · 31 tests |
+
 | Visual graph UI | ⬜ next — today the graph is JSON |
-| LangGraph / OpenAI Agents adapters | 🚧 LangGraph done · OpenAI Agents SDK next |
+| Framework adapters | ✅ LangGraph + OpenAI Agents SDK |
 | Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
 
 Being early means the fastest way to help is to try it, break it, and open an issue.
@@ -131,6 +132,20 @@ graph.invoke(inputs, config={"callbacks": [handler]})
 
 It maps graph nodes to agents, node-to-node transitions to **handoffs**, chat models to `llm_call`
 (with tokens and latency), and tools to `tool_call`/`tool_result` — with no changes to your graph code.
+
+And the **OpenAI Agents SDK** adapter (same duck-typed approach — the SDK is only required by
+`instrument()`):
+
+```python
+from necto_sdk.adapters.openai_agents import instrument
+
+instrument(Necto(endpoint="http://127.0.0.1:8000", framework="openai-agents"))
+
+result = await Runner.run(agent, "hello")
+```
+
+Agent spans become agents, handoff spans become **handoffs**, generation spans become `llm_call`
+(model, tokens, latency), and function spans become `tool_call`/`tool_result`.
 
 It is not on PyPI yet — install from the repo:
 

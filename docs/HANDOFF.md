@@ -554,4 +554,20 @@ Design decisions:
 
 **Tests:** 15 → 23 (8 adapter tests).
 
-**Next:** step ⑪ OpenAI Agents SDK adapter, then ⑫ generic/OTel bridge.
+**Step ⑪ — OpenAI Agents SDK adapter (
+`sdk/necto_sdk/adapters/openai_agents.py`).**
+
+- ${BT}NectoProcessor${BT} implements the SDK's ${BT}TracingProcessor${BT} interface (${BT}on_trace_start/end${BT},
+  ${BT}on_span_start/end${BT}, ${BT}shutdown${BT}, ${BT}force_flush${BT}). ${BT}instrument(necto)${BT} registers it.
+- Span mapping: ${BT}agent${BT} → ${BT}agent_start${BT}/${BT}agent_finish${BT}; ${BT}handoff${BT} → ${BT}handoff${BT}; ${BT}generation${BT} → ${BT}llm_call${BT}
+  (model, tokens from ${BT}usage${BT}, latency from span timestamps); ${BT}function${BT} → ${BT}tool_call${BT}/${BT}tool_result${BT}.
+- Provider is inferred from the model name (gpt/o1 → openai, claude → anthropic, gemini → google).
+- Duck-typed: importing the module never imports ${BT}agents${BT}. Only ${BT}instrument()${BT} needs the SDK and raises a
+  clear ImportError otherwise (covered by a test).
+- Verified end-to-end over HTTP: a simulated trace produced 5 nodes / 5 edges — handoff
+  triage→booking, gpt-4o-mini (240 tokens / 520 ms), claude-sonnet-4 (390 tokens / 450 ms) and a
+  check_availability tool round-trip (230 ms).
+
+**Tests:** 23 → 31 (8 OpenAI adapter tests).
+
+**Next:** step ⑫ generic/OTel bridge — closes Phase 2, then Phase 3 (visual graph UI).
