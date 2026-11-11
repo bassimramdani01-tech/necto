@@ -1,9 +1,15 @@
+import { Suspense, lazy } from "react";
+
 import { RecentRuns } from "./components/RecentRuns";
 import { StatusPill } from "./components/StatusPill";
 import { SummaryStrip } from "./components/SummaryStrip";
 import { RunDetailView } from "./views/RunDetailView";
-import { StatsView } from "./views/StatsView";
 import { useUiStore, type View } from "./store/ui";
+
+// Recharts is heavy; the dashboard is not on the critical path, so load it on demand.
+const StatsView = lazy(() =>
+  import("./views/StatsView").then((module) => ({ default: module.StatsView })),
+);
 
 const navItems: { id: View; label: string; ready: boolean }[] = [
   { id: "runs", label: "Runs", ready: true },
@@ -59,7 +65,11 @@ export default function App() {
 
       <main className="flex-1 overflow-y-auto">
         {view === "stats" ? (
-          <StatsView />
+          <Suspense
+            fallback={<div className="px-8 py-10 text-sm text-slate-500">Loading stats…</div>}
+          >
+            <StatsView />
+          </Suspense>
         ) : selectedRunId ? (
           <RunDetailView runId={selectedRunId} />
         ) : (

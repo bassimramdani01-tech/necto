@@ -8,7 +8,7 @@
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-![necto run detail with the interactive architecture graph](docs/assets/graph-view.png)
+![necto showing a run where a silent handoff failure is visible](docs/assets/demo-run.png)
 
 ---
 
@@ -166,6 +166,20 @@ pip install -e sdk/
 
 No framework required: the SDK is a plain tracer. Framework adapters (LangGraph, OpenAI Agents SDK)
 are the next milestone.
+## Try the demo
+
+No SDK integration needed to see it work. Generate a realistic multi-agent run —
+router → researcher → writer → critic — including a **silent handoff failure** (the router drops the
+order id; nobody notices until the critic rejects the draft). The graph is what makes it obvious:
+
+```bash
+python scripts/demo.py                    # 3 runs (uses the repo SDK, no installs)
+python scripts/demo.py --runs 8           # more data for the stats dashboard
+python scripts/demo.py --delay 0.4        # slow events down and watch the live graph build
+python scripts/demo.py --clean            # failure-free runs
+```
+
+Point it elsewhere with `--endpoint` / `--api-key`. Then open <http://localhost:5173>.
 ## Development
 
 Full setup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

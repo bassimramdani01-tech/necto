@@ -195,9 +195,12 @@ function buildEdges(
 ): Edge[] {
   return graph.edges.map((edge) => {
     const style = EDGE_STYLE[edge.kind] ?? { color: "#64748b", animated: false };
-    const label = edge.count > 1 ? `${edge.kind} ×${edge.count}` : edge.kind;
+    const baseLabel = edge.count > 1 ? `${edge.kind} ×${edge.count}` : edge.kind;
+    const hasError = edge.error_count > 0;
+    const label = hasError ? `${baseLabel} · ${edge.error_count} err` : baseLabel;
     const backward = (columnOf.get(edge.target) ?? 0) < (columnOf.get(edge.source) ?? 0);
     const isHot = highlight.has(edge.id);
+    const color = hasError ? "#fb7185" : style.color;
     return {
       id: edge.id,
       source: edge.source,
@@ -211,8 +214,8 @@ function buildEdges(
       labelBgStyle: { fill: "#0f172a", fillOpacity: 0.95 },
       labelBgPadding: [4, 2] as [number, number],
       labelBgBorderRadius: 4,
-      style: { stroke: style.color, strokeWidth: isHot ? 3 : 1.6 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: style.color, width: 16, height: 16 },
+      style: { stroke: color, strokeWidth: hasError ? 2.4 : isHot ? 3 : 1.6 },
+      markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
       selected: edge.id === selectedId,
     } as Edge;
   });
@@ -273,5 +276,10 @@ export const GRAPH_LEGEND = {
     label: kind,
     color: KIND_STYLE[kind]?.dot ?? "#64748b",
   })),
-  edges: Object.entries(EDGE_STYLE).map(([kind, style]) => ({ label: kind, color: style.color })),
+  edges: [
+    ...Object.entries(EDGE_STYLE)
+      .filter(([kind]) => kind !== "error")
+      .map(([kind, style]) => ({ label: kind, color: style.color })),
+    { label: "with errors", color: "#fb7185" },
+  ],
 };

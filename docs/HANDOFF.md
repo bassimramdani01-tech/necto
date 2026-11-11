@@ -841,3 +841,35 @@ metric duplicated "events" when scoped.
 | ⑱ | Stats dashboard: cost/tokens/latency per model & agent, event mix, edge failure rates |
 
 **Next: Phase 4 — demo generator, first-boot seed, demo GIF, landing polish.**
+
+---
+
+## 20. Update log — Phase 4, step ⑲ (demo generator)
+
+`scripts/demo.py` simulates a support-ticket pipeline and ships data through the **repo SDK**
+(no dependencies; plain Python 3.10+):
+
+- router classifies the ticket → researcher looks up policy (2 tools) → writer drafts the reply →
+  critic reviews it. `state_write` stores the draft, `message` events carry the delegation.
+- **Silent handoff failure**: the router's `message` contains the order id, but its `handoff`
+  `context_snippet` does not — so nobody downstream has it. The critic raises an error at review
+  time. Every third run is clean (`--clean` disables failures entirely).
+- Flags: `--runs`, `--seed` (deterministic), `--delay` (pace events to watch the UI build live),
+  `--endpoint`, `--api-key`.
+
+**Verified:** 3 runs produced 23–24 events / 9 nodes / 13 edges each (4 agents, 2 models, 2 tools,
+1 state node), costs around $0.012–0.015 per run, and the error correctly lands on the critic's
+model-call edge in the two broken runs.
+
+**Graph readability fix found by looking at the result:** edges carrying errors looked exactly like
+healthy edges, so the whole point of the demo was invisible. Edges with `error_count > 0` are now
+drawn in red with a `· N err` label, and the legend describes the overlay instead of a phantom
+`error` edge kind.
+
+**Code-splitting (carried over from step ⑱):** the stats route is now `React.lazy` + `Suspense`, so
+Recharts is no longer on the critical path. Main bundle **896 kB → 490 kB** (154.8 kB gzip); the
+stats chunk (406 kB / 114.8 kB gzip) loads only when opened.
+
+Screenshot: `docs/assets/demo-run.png` (now the README hero).
+
+**Next:** step ⑳ first-boot seed, then ㉑ demo GIF, ㉒ landing README.
