@@ -40,6 +40,7 @@ def test_trace_lifecycle_creates_and_finishes_run():
     transport, p = setup()
     p.on_trace_start(Trace("Support workflow"))
     assert transport.runs[0]["name"] == "Support workflow"
+    assert p.last_run_id == transport.runs[0]["id"]
     p.on_trace_end(Trace())
     assert transport.finished[0]["status"] == "ok"
 

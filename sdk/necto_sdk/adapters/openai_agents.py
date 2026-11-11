@@ -103,6 +103,7 @@ class NectoProcessor:
         self.name = name
         self.meta = dict(meta or {})
         self._run: Run | None = None
+        self.last_run_id: str | None = None
         self._agents: list[str] = []
         self._tools: dict[Any, str] = {}
 
@@ -113,6 +114,7 @@ class NectoProcessor:
     def _ensure_run(self, name: str | None = None) -> Run:
         if self._run is None:
             self._run = self.necto.start_run(name or self.name, self.meta)
+            self.last_run_id = self._run.run_id
         return self._run
 
     def _current_agent(self) -> str:

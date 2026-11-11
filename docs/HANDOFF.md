@@ -995,3 +995,24 @@ totals (6 events / $0.00030 / 229 tokens), empty-run placeholder, and topology (
 
 **Next:** Tier 2 polish (pagination, search/sort, absolute timestamps, copy-JSON, edge tooltips,
 favicon, responsive layout) and Tier 3 (Docker self-host, frontend tests, SDK 429 handling).
+
+---
+
+## 25. Examples for real-world testing
+
+Added `examples/` so a first-time user can get real data in without reverse-engineering the SDK:
+
+| Example | Needs | Shows |
+|---|---|---|
+| `examples/plain_sdk.py` | nothing | tracer API: agent, llm_call, handoff, tool round-trip |
+| `examples/langgraph_app.py` | `langgraph` + `langchain-openai` + `OPENAI_API_KEY` | a real LangGraph graph, mapped automatically |
+| `examples/openai_agents_app.py` | `openai-agents` + `OPENAI_API_KEY` | OpenAI Agents SDK with a real handoff |
+
+`plain_sdk.py` was run end-to-end (8 events, framework `example`); the provider examples are
+syntax-checked only — no API keys or provider packages are available on this machine.
+
+Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now exposed, so an
+instrumented app can print a direct UI link to its run. Covered by assertions in the adapter tests.
+
+**Manual-run instructions verified:** `uv sync --frozen` works offline (it only reinstalls the
+local package), so a machine with a populated `.venv` can start without PyPI access.

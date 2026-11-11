@@ -146,6 +146,7 @@ class NectoCallbackHandler:
         self.name = name
         self.meta = dict(meta or {})
         self._run: Run | None = None
+        self.last_run_id: str | None = None
         self._root_id: Any = None
         self._last_node: str | None = None
         self._chains: dict[Any, str | None] = {}
@@ -160,6 +161,7 @@ class NectoCallbackHandler:
     def _ensure_run(self, name: str | None) -> Run:
         if self._run is None:
             self._run = self.necto.start_run(name or self.name, self.meta)
+            self.last_run_id = self._run.run_id
         return self._run
 
     def _node_for(self, run_id: Any) -> str | None:

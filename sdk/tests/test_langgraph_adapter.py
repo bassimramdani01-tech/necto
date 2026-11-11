@@ -38,6 +38,8 @@ def test_root_chain_creates_and_finishes_run():
     handler.on_chain_start({"name": "graph"}, {"q": "hi"}, run_id="root")
     assert len(transport.runs) == 1
     assert transport.runs[0]["name"] == "graph"
+    # exposed so an app can link straight to the run in the UI
+    assert handler.last_run_id == transport.runs[0]["id"]
     handler.on_chain_end({}, run_id="root")
     assert transport.finished[0]["status"] == "ok"
 

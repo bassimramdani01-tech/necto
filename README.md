@@ -158,6 +158,7 @@ CI pipeline. The roadmap lives in [PLAN.md](PLAN.md); current status and audit h
 - [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — environment setup, troubleshooting
 - [docs/HANDOFF.md](docs/HANDOFF.md) — status, audits, roadmap
+- [examples/](examples/README.md) — runnable examples, including real LangGraph / OpenAI Agents apps
 
 ## Development
 
