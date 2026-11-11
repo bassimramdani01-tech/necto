@@ -937,3 +937,29 @@ Also: the first captures lost their opening seconds to Vite compiling the run-de
 script now warms that route before starting the demo.
 
 **Next:** step ㉒ landing README (badges, why-necto, quickstart polish).
+
+---
+
+## 23. Update log — Phase 4, step ㉒ (landing README). Phase 4 complete.
+
+The README was rewritten as a landing page and its claims audited against reality:
+
+- **Stale badge fixed**: it advertised 64 tests; the suites now total **125** (74 server + 51 SDK).
+- Added a **"Why not just use a trace viewer?"** table positioning necto against LangSmith /
+  Langfuse — and saying plainly where they are stronger (maturity, per-request depth).
+- Added a "What it looks like" gallery (inspector, stats, live, replay) and the hero GIF.
+- Condensed quickstart: DB → migrate → run API (`NECTO_SEED=1`) → run UI.
+- Fixed a wrong command in the tests section (the SDK suite is run from the repo root with
+  `PYTHONPATH=sdk`, not from `server/`).
+- Every relative link and image was verified to resolve (scripted check).
+
+**Phase 4 summary (steps ⑲–㉒) — DONE**
+
+| Step | Deliverable |
+|---|---|
+| ⑲ | `scripts/demo.py` — support pipeline with a silent handoff failure; stats bundle split |
+| ⑳ | `NECTO_SEED=1` first-boot seed (6 runs, idempotent) |
+| ㉑ | `docs/assets/demo.gif` via Edge DevTools Protocol + Pillow |
+| ㉒ | Landing README with badges, comparison, quickstart, gallery |
+
+**Next: Phase 5 — CI (GitHub Actions), PyPI + GitHub release, community rails, launch.**

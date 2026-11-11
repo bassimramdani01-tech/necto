@@ -2,11 +2,15 @@
 
 > *necto* — Latin: "I bind, I connect, I join."
 
-**necto draws a map of your AI system.** Point it at an app built from multiple agents, models and tools, and it renders the whole thing as one interactive network graph — so you can see how your AI actually works, instead of piecing it together from logs.
+**necto draws a map of your AI system.** Point it at an app built from multiple agents, models and
+tools, and it renders the whole thing as one interactive network graph — so you can see how your AI
+actually works, instead of piecing it together from logs.
 
-![tests](https://img.shields.io/badge/tests-64%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-125%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
+![node](https://img.shields.io/badge/node-20%2B-yellow)
 ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-pre--release-orange)
 
 ![necto: a live multi-agent run building, rewound, and inspected](docs/assets/demo.gif)
 
@@ -14,268 +18,188 @@
 
 ## The goal
 
-> **Make it easy for developers to map out their AI architecture — so the problems and workflows inside it become something you can *see*, not something you have to guess.**
+> **Make it easy for developers to map out their AI architecture — so the problems and workflows
+> inside it become something you can *see*, not something you have to guess.**
 
-Multi-agent systems *are* graphs: one agent hands work to another, calls a model, uses a tool, passes the result back. But we build and debug them like lists — reading logs line by line, holding the wiring in our heads.
+Multi-agent systems *are* graphs: one agent hands work to another, calls a model, uses a tool, passes
+the result back. But we build and debug them like lists — reading logs line by line, holding the
+wiring in our heads.
 
-necto gives that graph a face. It is a **map of your AI architecture**: agents, models and tools as nodes, and the calls, tool uses and handoffs between them as edges. Click any connection and see what actually travelled over it.
+necto gives that graph a face: agents, models and tools as nodes; calls, tool uses and **handoffs**
+as edges. Click any connection and see what travelled over it.
 
-## The problem it solves
+## Why not just use a trace viewer?
 
-Once a system has more than a couple of agents, the important information stops being visible:
+Trace tools answer *"what happened in this request?"*. necto answers a different question:
+*"how is my system wired, and where does it break?"*
 
-- **You can't see the shape of your system.** Which agent calls which? Where does control change hands?
-- **Workflows are invisible.** The path a request takes — agent → model → tool → another agent — only exists in code.
-- **Failures are silent.** A routing agent sends work to the wrong place and nothing tells you until the final answer is wrong.
-- **Cost and time are opaque.** The bill is a single number; it never says *which agent or which model* is burning it.
-- **Every framework hides it differently.** LangGraph, the OpenAI Agents SDK and hand-rolled code each trace their own way — or not at all.
+| | Trace list (LangSmith, Langfuse, …) | necto |
+|---|---|---|
+| Primary view | chronological spans | **the topology of your system** |
+| Handoffs | just another span | **first-class, highlighted edges** |
+| Across runs | filters and diffs | **one aggregate map of everything** |
+| Cost / latency | per call | **per agent and per model, on the graph** |
+| Data model | vendor-specific | open event schema; any framework |
+| Hosting | paid tiers for teams | MIT, runs entirely on your machine |
 
-## What necto gives you
+They are complementary: keep your tracer for deep per-request debugging, and use necto to understand
+the system. necto is early — the tracer ecosystem is far more mature.
 
-- **A live network graph** — agents, models and tools as nodes; calls, tool uses and handoffs as edges.
-- **Click any connection** to see exactly what crossed it: the model, token counts, cost, latency.
-- **Handoffs highlighted.** Control passing from one agent to another is the most common silent failure, so those edges are marked distinctly.
-- **Your whole system, not a single trace.** An aggregate topology across every run, plus per-run detail.
-- **Live streaming.** Watch the graph build itself while your agents work.
-- **Cost, tokens and latency broken down** per agent and per model — so "which agent is expensive?" has an answer.
+## What it looks like
 
-## Who it's for
+Clicking a node or edge opens an **inspector** with its metrics and the exact events behind it,
+including raw payloads:
 
-Anyone building with more than one agent or model: indie developers prototyping agent pipelines, teams debugging a multi-agent workflow, and curious people who want to see how their favourite agent framework actually behaves.
+![inspector open on a node](docs/assets/inspector-view.png)
 
-No framework lock-in is required by design — the schema is neutral and every framework translates into it.
+A **stats dashboard** covers spend, calls, latency and failures per model and per agent, plus
+per-edge error rates:
 
-## Where it is today
+![stats dashboard](docs/assets/stats-view.png)
 
-necto is **early**. The backend is complete and tested; the SDK and the visual UI are the next milestones.
+A live run **builds the graph as it happens**, and the **replay scrubber** rebuilds it at any point:
 
-| Piece | Status |
-|---|---|
-| Ingestion API, graph projection, query + stats, live streaming | ✅ built · 64 tests |
-| Python SDK | ✅ core tracer + LangGraph / OpenAI Agents / OpenTelemetry adapters · 51 tests |
-
-| Visual graph UI | ⬜ next — today the graph is JSON |
-| Framework adapters | ✅ LangGraph · OpenAI Agents SDK · OpenTelemetry |
-| Self-host via `docker compose` | ✅ verified — PostgreSQL 16.15 container, healthy, 64 tests pass against it |
-
-Being early means the fastest way to help is to try it, break it, and open an issue.
-
----
-
-## Docs
-
-- [SPEC.md](SPEC.md) — vision and positioning
-- [PLAN.md](PLAN.md) — step-by-step build plan
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design
-- [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — developer environment setup
-- [docs/HANDOFF.md](docs/HANDOFF.md) — project handoff & status report
+![live run](docs/assets/live-view.png)
+![replay](docs/assets/replay-view.png)
 
 ## Quickstart
 
-Start the backend (see [Development](#development)), then:
+Requirements: Docker, Python 3.12+, Node 20+.
 
 ```bash
-# 1. start a run — the response contains the run id
-curl -s -X POST http://127.0.0.1:8000/v1/runs \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "demo"}'
+docker compose up -d db
 
-# 2. copy the id from the response, then send events
-curl -s -X POST http://127.0.0.1:8000/v1/runs/<RUN_ID>/events \
-  -H 'Content-Type: application/json' \
-  -d '{"events": [
-    {"ts": "2025-01-15T10:00:00Z", "type": "agent_start", "schema_version": 1,
-     "to": "agent:router", "payload": {"name": "Router"}},
-    {"ts": "2025-01-15T10:00:01Z", "type": "handoff", "schema_version": 1,
-     "from": "agent:router", "to": "agent:researcher",
-     "payload": {"reason": "needs_research"}}
-  ]}'
+# API
+cd server
+uv sync
+uv run alembic upgrade head
+NECTO_SEED=1 uv run uvicorn necto_server.main:app --reload
 
-# 3. inspect the network
-curl -s http://127.0.0.1:8000/v1/runs/<RUN_ID>/graph
-```
+# UI (new terminal)
+cd web
+pnpm install
+pnpm dev
+``` 
 
-Interactive API docs: <http://127.0.0.1:8000/docs>
+Open **<http://localhost:5173>** — with `NECTO_SEED=1` the empty database is filled with six
+realistic demo runs on first boot, so there is something to explore immediately.
 
-> The Python SDK and the visual UI don't exist yet — for now events are posted by hand.
+![seeded dashboard](docs/assets/seed-view.png)
 
+## Try the demo
+
+Generate a fresh multi-agent run at any time — router → researcher → writer → critic, including a
+**silent handoff failure** (the router drops the order id; nobody notices until the critic rejects
+the draft):
+
+```bash
+python scripts/demo.py                    # 3 runs, uses the repo SDK
+python scripts/demo.py --delay 0.4        # slow it down and watch the graph build live
+python scripts/demo.py --clean            # no failures
+``` 
+
+![a demo run with the erroring edge in red](docs/assets/demo-run.png)
 
 ## Python SDK
 
-The SDK buffers events, ships them in the background, and **never raises into your app** — if the
-server is down, events are dropped and logged.
-
-```python
-from necto_sdk import Necto
-
-necto = Necto(endpoint="http://127.0.0.1:8000", framework="langgraph")
-
-with necto.run(name="packing-agent") as run:
-    run.agent_start("router", name="Router")
-    run.llm_call("router", "openai", "gpt-4o-mini",
-                 input_tokens=812, output_tokens=95, cost_usd=0.0021)
-    run.handoff("router", "researcher", reason="needs sources")
-    run.tool_call("researcher", "web_search")
-    run.tool_result("web_search", "researcher", ok=True, latency_ms=430)
-```
-
-Already built: a **LangGraph / LangChain adapter**. One line attaches it:
+Three lines to instrument a LangGraph app:
 
 ```python
 from necto_sdk import Necto
 from necto_sdk.adapters.langgraph import NectoCallbackHandler
 
-necto = Necto(endpoint="http://127.0.0.1:8000", framework="langgraph")
-handler = NectoCallbackHandler(necto)
-
+handler = NectoCallbackHandler(Necto(endpoint="http://127.0.0.1:8000", framework="langgraph"))
 graph.invoke(inputs, config={"callbacks": [handler]})
 ```
 
-It maps graph nodes to agents, node-to-node transitions to **handoffs**, chat models to `llm_call`
-(with tokens and latency), and tools to `tool_call`/`tool_result` — with no changes to your graph code.
+| Adapter | Attach with |
+|---|---|
+| LangGraph / LangChain | `NectoCallbackHandler(necto)` in `config={"callbacks": [...]}` |
+| OpenAI Agents SDK | `instrument(necto)` from `necto_sdk.adapters.openai_agents` |
+| OpenTelemetry | `instrument(necto)` from `necto_sdk.adapters.otel` |
+| Anything else | plain tracer: `run.agent_start()` / `handoff()` / `llm_call()` / `tool_call()` |
 
-And the **OpenAI Agents SDK** adapter (same duck-typed approach — the SDK is only required by
-`instrument()`):
-
-```python
-from necto_sdk.adapters.openai_agents import instrument
-
-instrument(Necto(endpoint="http://127.0.0.1:8000", framework="openai-agents"))
-
-result = await Runner.run(agent, "hello")
-```
-
-Agent spans become agents, handoff spans become **handoffs**, generation spans become `llm_call`
-(model, tokens, latency), and function spans become `tool_call`/`tool_result`.
-
-Anything that already emits **OpenTelemetry** works through the OTel bridge (GenAI semantic
-conventions, plus `necto.from` / `necto.to` attributes for explicit handoffs):
-
-```python
-from necto_sdk.adapters.otel import instrument
-
-instrument(Necto(endpoint="http://127.0.0.1:8000", framework="otel"))
-```
-
-It is not on PyPI yet — install from the repo:
+The SDK has **zero runtime dependencies**, buffers events and flushes them in the background, and
+**never raises into your app** — if the server is down, events are dropped and logged.
 
 ```bash
 pip install -e sdk/
-```
+``` 
 
-No framework required: the SDK is a plain tracer. Framework adapters (LangGraph, OpenAI Agents SDK)
-are the next milestone.
-## First boot: instant demo data
+## How it works
 
-Point necto at an empty database with `NECTO_SEED=1` and it fills itself with six realistic
-support-pipeline runs — including the silent handoff failures — so the dashboard is useful
-immediately. Seeding only happens when the database has no runs, so it is safe to leave on.
+text
+SDK or HTTP  ──▶  event log (schema v1)  ──▶  graph projection  ──▶  API  ──▶  graph UI
+ 
 
-```bash
-cd server
-NECTO_SEED=1 uv run uvicorn necto_server.main:app --reload
-```
+Events are the source of truth; **the graph is computed, never stored**. That is what makes replay,
+diffing and the aggregate topology cheap. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the
+normative [docs/SCHEMA.md](docs/SCHEMA.md).
 
-![seeded runs dashboard](docs/assets/seed-view.png)
-## Try the demo
+## Status
 
-No SDK integration needed to see it work. Generate a realistic multi-agent run —
-router → researcher → writer → critic — including a **silent handoff failure** (the router drops the
-order id; nobody notices until the critic rejects the draft). The graph is what makes it obvious:
+| Piece | State |
+|---|---|
+| Backend — ingestion, graph, query, live WebSocket | ✅ done · **74 tests** |
+| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **51 tests** |
+| Web UI — runs, graph, live, replay, inspector, stats | ✅ done |
+| Self-host via `docker compose` | ✅ verified (PostgreSQL 16 in Docker) |
+| CI, PyPI release, GitHub release | ⬜ Phase 5 |
 
-```bash
-python scripts/demo.py                    # 3 runs (uses the repo SDK, no installs)
-python scripts/demo.py --runs 8           # more data for the stats dashboard
-python scripts/demo.py --delay 0.4        # slow events down and watch the live graph build
-python scripts/demo.py --clean            # failure-free runs
-```
+necto is **pre-release**: usable, tested and documented, but not yet published to PyPI and without a
+CI pipeline. The roadmap lives in [PLAN.md](PLAN.md); current status and audit history in
+[docs/HANDOFF.md](docs/HANDOFF.md).
 
-Point it elsewhere with `--endpoint` / `--api-key`. Then open <http://localhost:5173>.
+## Docs
 
-![a demo run with the erroring edge in red](docs/assets/demo-run.png)
+- [SPEC.md](SPEC.md) — vision and positioning
+- [PLAN.md](PLAN.md) — the build plan
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design
+- [docs/SCHEMA.md](docs/SCHEMA.md) — event schema v1 (the contract)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — environment setup, troubleshooting
+- [docs/HANDOFF.md](docs/HANDOFF.md) — status, audits, roadmap
 
-Regenerate the GIF above with `python scripts/demo_gif.py` (needs Edge + Pillow; no Playwright
-or ffmpeg required).
 ## Development
-
-Full setup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-### Database
-
-```bash
-docker compose up -d db
-```
-
-Or run the portable PostgreSQL stand-in described in the development guide.
 
 ### Server
 
 ```bash
 cd server
-uv sync                      # install dependencies
-uv run alembic upgrade head  # create / upgrade the schema
-uv run uvicorn necto_server.main:app --reload
-```
-
-Then open <http://127.0.0.1:8000/healthz> — expect:
-
-```json
-{"status": "ok", "database": "up", "version": "0.1.0"}
-```
-
-### Tests and lint
-
-```bash
-cd server
-uv run pytest -q
-uv run ruff check && uv run ruff format --check
-```
-
-### Backfill agent/model registries
-
-The registries are populated at ingest time. For data written before that existed:
-
-```bash
-cd server
-uv run python scripts/backfill_registries.py
-```
-
-It is idempotent — safe to run repeatedly.
+uv sync
+uv run alembic upgrade head
+uv run uvicorn necto_server.main:app --reload     # http://127.0.0.1:8000/docs
+``` 
 
 ### Web UI
-
-The dashboard lives in `web/` (Vite + React 19 + TypeScript + Tailwind 4, TanStack Query,
-Zustand). In development it proxies `/v1` and `/healthz` to the API on port 8000, including the
-live WebSocket upgrade.
 
 ```bash
 cd web
 pnpm install
-pnpm dev        # http://localhost:5173
-```
+pnpm dev            # http://localhost:5173  (proxies /v1 + WebSocket to :8000)
+``` 
 
-Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production build:
-`pnpm build` (outputs `web/dist`).
+### Tests
 
-![replay mode scrubbing back through a run](docs/assets/replay-view.png)
+```bash
+cd server && uv run pytest -q      # 74 server tests
 
-![inspector open on the router node, showing its events](docs/assets/inspector-view.png)
+cd .. && PYTHONPATH=sdk python -m pytest sdk/tests -q   # 51 SDK tests
+``` 
 
-A stats dashboard covers cost, tokens and latency per model and per agent, the event mix, and
-per-edge failure rates:
+### Regenerate the demo GIF
 
-![stats dashboard](docs/assets/stats-view.png)
+```bash
+python scripts/demo_gif.py               # Edge + Pillow, no Playwright/ffmpeg
+``` 
 
-The dashboard lists runs and opens a run detail page with the interactive architecture graph,
-a **live indicator** (events stream in over a WebSocket and the graph updates without a reload),
-a **replay scrubber** that rebuilds the graph at any point in the run, and an **inspector** —
-click any node or edge to see its metrics and the exact events behind it, with raw payloads:
-agents in the left column in handoff order, models and tools aligned to the agent that used
-them, weighted edges coloured by call type, and hover labels showing counts.
+### Backfill agent/model registries
+
+```bash
+cd server
+uv run python scripts/backfill_registries.py
+``` 
+
 ## API (v1)
-
-Served by the FastAPI app in `server/`.
 
 ### Ingestion
 
@@ -311,16 +235,13 @@ Served by the FastAPI app in `server/`.
 
 ### Authentication
 
-Auth is **off by default** (local development). Set `NECTO_API_KEY` to require an
-`X-API-Key` header on every `/v1` endpoint, including the live WebSocket:
-
-```bash
-NECTO_API_KEY=my-secret uv run uvicorn necto_server.main:app
-```
-
-`GET /`, `GET /healthz` and `/docs` stay public.
+Off by default. Set `NECTO_API_KEY` to require an `X-API-Key` header on every `/v1`
+endpoint, including the WebSocket. `GET /`, `/healthz` and `/docs` stay public.
 
 ### Pagination
 
-`GET /v1/runs` returns an `X-Total-Count` header with the unpaginated total, so clients can
-render "page 2 of 7".
+`GET /v1/runs` returns an `X-Total-Count` header with the unpaginated total.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
