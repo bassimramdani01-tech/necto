@@ -227,7 +227,11 @@ pnpm dev        # http://localhost:5173
 Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production build:
 `pnpm build` (outputs `web/dist`).
 
-The dashboard lists runs and opens a run detail page with the interactive architecture graph:
+![replay mode scrubbing back through a run](docs/assets/replay-view.png)
+
+The dashboard lists runs and opens a run detail page with the interactive architecture graph,
+a **live indicator** (events stream in over a WebSocket and the graph updates without a reload),
+and a **replay scrubber** that rebuilds the graph at any point in the run:
 agents in the left column in handoff order, models and tools aligned to the agent that used
 them, weighted edges coloured by call type, and hover labels showing counts.
 ## API (v1)

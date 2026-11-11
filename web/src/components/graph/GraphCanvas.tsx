@@ -40,6 +40,13 @@ interface NodeData extends Record<string, unknown> {
   node: GraphNode;
 }
 
+/** Nodes inferred from a ref (a handoff target, say) have no payload name yet. */
+function displayName(node: GraphNode): string {
+  if (node.name) return node.name;
+  const parts = node.id.split(":");
+  return parts.length > 1 ? (parts[parts.length - 1] as string) : node.id;
+}
+
 function NectoNode({ data }: NodeProps) {
   const node = (data as NodeData).node;
   const style = KIND_STYLE[node.kind] ?? KIND_STYLE.external;
@@ -50,7 +57,7 @@ function NectoNode({ data }: NodeProps) {
       <Handle id="target-right" type="target" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-slate-600" />
       <div className="flex items-center justify-between gap-2">
         <span className="max-w-[130px] truncate text-sm font-medium text-slate-100">
-          {node.name ?? node.id}
+          {displayName(node)}
         </span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${style.chip}`}>
           {node.kind}
@@ -181,11 +188,18 @@ function layout(nodes: GraphNode[], edges: GraphEdge[]): Node[] {
   return positioned;
 }
 
-function buildEdges(graph: GraphResponse, columnOf: Map<string, number>): Edge[] {
+const NO_HIGHLIGHT: ReadonlySet<string> = new Set<string>();
+
+function buildEdges(
+  graph: GraphResponse,
+  columnOf: Map<string, number>,
+  highlight: ReadonlySet<string>,
+): Edge[] {
   return graph.edges.map((edge) => {
     const style = EDGE_STYLE[edge.kind] ?? { color: "#64748b", animated: false };
     const label = edge.count > 1 ? `${edge.kind} ×${edge.count}` : edge.kind;
     const backward = (columnOf.get(edge.target) ?? 0) < (columnOf.get(edge.source) ?? 0);
+    const isHot = highlight.has(edge.id);
     return {
       id: edge.id,
       source: edge.source,
@@ -193,27 +207,33 @@ function buildEdges(graph: GraphResponse, columnOf: Map<string, number>): Edge[]
       type: "smoothstep",
       sourceHandle: backward ? "source-left" : "source-right",
       targetHandle: backward ? "target-right" : "target-left",
-      animated: style.animated,
+      animated: style.animated || isHot,
       label,
       labelStyle: { fill: "#cbd5e1", fontSize: 10 },
       labelBgStyle: { fill: "#0f172a", fillOpacity: 0.95 },
       labelBgPadding: [4, 2] as [number, number],
       labelBgBorderRadius: 4,
-      style: { stroke: style.color, strokeWidth: 1.6 },
+      style: { stroke: style.color, strokeWidth: isHot ? 3 : 1.6 },
       markerEnd: { type: MarkerType.ArrowClosed, color: style.color, width: 16, height: 16 },
     } as Edge;
   });
 }
 
-export function GraphCanvas({ graph }: { graph: GraphResponse }) {
+export function GraphCanvas({
+  graph,
+  highlightEdgeIds = NO_HIGHLIGHT,
+}: {
+  graph: GraphResponse;
+  highlightEdgeIds?: ReadonlySet<string>;
+}) {
   const nodes = useMemo(() => layout(graph.nodes, graph.edges), [graph.nodes, graph.edges]);
   const edges = useMemo(() => {
     const columnOf = new Map<string, number>();
     for (const node of nodes) {
       columnOf.set(node.id, Math.round((node.position.x - 40) / 300));
     }
-    return buildEdges(graph, columnOf);
-  }, [graph, nodes]);
+    return buildEdges(graph, columnOf, highlightEdgeIds);
+  }, [graph, nodes, highlightEdgeIds]);
 
   return (
     <div className="h-[600px] w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950">

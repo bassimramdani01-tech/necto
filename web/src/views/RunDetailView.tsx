@@ -1,7 +1,11 @@
+import { useEffect, useMemo, useState } from "react";
 import { GRAPH_LEGEND, GraphCanvas } from "../components/graph/GraphCanvas";
 import { Metric } from "../components/Metric";
+import { Timeline } from "../components/Timeline";
 import { formatDuration, formatMoney, formatNumber, formatRelative } from "../lib/format";
-import { useRun, useRunGraph } from "../lib/queries";
+import { projectGraph } from "../lib/projectGraph";
+import { useRun, useRunEvents, useRunGraph } from "../lib/queries";
+import { useLiveRun } from "../lib/ws";
 import { useUiStore } from "../store/ui";
 
 const statusStyles: Record<string, string> = {
@@ -10,6 +14,8 @@ const statusStyles: Record<string, string> = {
   error: "bg-rose-500/15 text-rose-300 ring-rose-500/30",
   cancelled: "bg-slate-500/15 text-slate-300 ring-slate-500/30",
 };
+
+type Mode = "live" | "replay";
 
 function StatusChip({ status }: { status: string }) {
   return (
@@ -48,10 +54,57 @@ function Legend() {
   );
 }
 
+function readReplayPoint(): number | null {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("at");
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : null;
+}
+
 export function RunDetailView({ runId }: { runId: string }) {
   const selectRun = useUiStore((state) => state.selectRun);
   const run = useRun(runId);
-  const graph = useRunGraph(runId);
+  const graphQuery = useRunGraph(runId);
+  const eventsQuery = useRunEvents(runId);
+
+  const isRunning = run.data?.status === "running";
+  const live = useLiveRun(runId, isRunning);
+
+  const events = eventsQuery.data ?? [];
+  const total = events.length;
+  const [mode, setMode] = useState<Mode>("live");
+  const [cursor, setCursor] = useState(0);
+  const [replayInitialised, setReplayInitialised] = useState(false);
+
+  // Deep link: ?run=<id>&at=<n> opens replay at a specific event.
+  useEffect(() => {
+    if (replayInitialised || total === 0) return;
+    const point = readReplayPoint();
+    if (point !== null && point < total) {
+      setMode("replay");
+      setCursor(point);
+    }
+    setReplayInitialised(true);
+  }, [replayInitialised, total]);
+
+  // In live mode the cursor is simply the end of the event list — no state to race with.
+  const liveCursor = mode === "live" ? total : cursor;
+
+  const replayGraph = useMemo(() => {
+    if (mode !== "replay" || total === 0) return null;
+    return projectGraph(events.slice(0, cursor), runId);
+  }, [mode, total, events, cursor, runId]);
+
+  const highlightEdgeIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const event of live.recentEvents) {
+      if (event.from_ref && event.to_ref) {
+        set.add(`${event.from_ref}->${event.to_ref}:${event.type}`);
+      }
+    }
+    return set;
+  }, [live.recentEvents]);
 
   if (run.isLoading) {
     return <div className="px-8 py-10 text-sm text-slate-500">Loading run…</div>;
@@ -75,6 +128,9 @@ export function RunDetailView({ runId }: { runId: string }) {
   }
 
   const detail = run.data;
+  const graph = mode === "replay" && replayGraph ? replayGraph : graphQuery.data;
+  const cursorLabel = Math.min(liveCursor, total);
+  const timestamps = events.map((event) => event.ts);
 
   return (
     <div className="px-8 py-6">
@@ -115,23 +171,42 @@ export function RunDetailView({ runId }: { runId: string }) {
       <section className="mt-8 space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-medium text-slate-300">Architecture</h2>
-          {graph.data ? (
+          {graph ? (
             <span className="text-xs text-slate-500">
-              {graph.data.nodes.length} nodes · {graph.data.edges.length} edges
+              {graph.nodes.length} {graph.nodes.length === 1 ? "node" : "nodes"} ·{" "}
+              {graph.edges.length} {graph.edges.length === 1 ? "edge" : "edges"}
+              {mode === "replay" ? ` · at event ${cursorLabel}` : null}
             </span>
           ) : null}
         </div>
 
-        {graph.isLoading ? (
-          <div className="flex h-[560px] items-center justify-center rounded-lg border border-slate-800 text-sm text-slate-500">
+        <Timeline
+          mode={mode}
+          cursor={liveCursor}
+          total={total}
+          timestamps={timestamps}
+          connected={live.connected}
+          finished={live.finished || !isRunning}
+          onSetMode={(next) => {
+            if (next === "replay") setCursor(total);
+            setMode(next);
+          }}
+          onChange={(value) => {
+            setMode("replay");
+            setCursor(value);
+          }}
+        />
+
+        {graphQuery.isLoading && mode === "live" ? (
+          <div className="flex h-[600px] items-center justify-center rounded-lg border border-slate-800 text-sm text-slate-500">
             Loading graph…
           </div>
-        ) : graph.isError || !graph.data ? (
+        ) : graph ? (
+          <GraphCanvas graph={graph} highlightEdgeIds={highlightEdgeIds} />
+        ) : (
           <div className="rounded-lg border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
             Could not load the graph for this run.
           </div>
-        ) : (
-          <GraphCanvas graph={graph.data} />
         )}
 
         <Legend />

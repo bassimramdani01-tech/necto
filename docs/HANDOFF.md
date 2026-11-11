@@ -725,3 +725,40 @@ Screenshots committed to `docs/assets/graph-view.png` and `docs/assets/runs-view
 **Build:** `pnpm build` → tsc clean, 113 modules, 474 kB JS / 37 kB CSS (150 kB / 7 kB gzip).
 
 **Next:** step ⑯ live updates + replay scrubber, ⑰ inspector panel, ⑱ stats dashboard.
+
+---
+
+## 17. Update log — Phase 3, step ⑯ (live updates + replay)
+
+**Live updates (`web/src/lib/ws.ts`).** `useLiveRun` opens `/v1/live/runs/{id}` (through the Vite
+proxy, which handles the WebSocket upgrade). On `hello` it marks the connection live; on `events` it
+invalidates the graph / events / run queries — so the graph, header metrics and timeline all refresh —
+and it keeps the batch's edge ids for ~2.5 s so freshly-arrived edges render thicker and animated.
+Reconnects automatically after a drop, and stops when the run finishes.
+
+**Replay (`web/src/lib/projectGraph.ts` + `components/Timeline.tsx`).** The client re-implements the
+server's graph projection (SCHEMA §7) so it can rebuild the graph from `events.slice(0, cursor)`.
+A Live/Replay toggle plus a range slider scrubs through every event; the header shows
+`N nodes · M edges · at event K`. `?run=<id>&at=<n>` deep-links straight into a replay position.
+
+**Verified with a real browser (Edge over the DevTools Protocol):**
+
+| Check | Result |
+|---|---|
+| WebSocket connected (live badge in UI) | ✅ |
+| Post 2 events while the page is open | graph went **1 node → 3 nodes, 0 → 1 edges** |
+| Time to update, no reload | **1.1 s** |
+| Replay `?at=2` | **2 nodes · 0 edges · at event 2**, slider at 2/3 |
+
+**Two bugs caught by looking at the rendered page:**
+
+1. The replay cursor was stuck at the end: an effect that snapped the cursor to `total` in live mode
+   ran after the deep-link effect and overwrote `setCursor(point)` in the same commit. Fixed by
+   deriving the live cursor (`mode === "live" ? total : cursor`) instead of storing it.
+2. Client-projected nodes rendered raw refs (`agent:researcher`, `model:openai:gpt-4o-mini`) because
+   only `agent_start` set a name. Fixed by naming model/tool nodes from their payloads and falling
+   back to the ref's last segment for inferred nodes.
+
+Screenshots: `docs/assets/live-view.png`, `docs/assets/replay-view.png`.
+
+**Next:** step ⑰ inspector panel (click node/edge → details), ⑱ stats dashboard.
