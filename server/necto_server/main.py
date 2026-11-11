@@ -1,3 +1,6 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -7,11 +10,32 @@ from .api.graph import router as graph_router
 from .api.live import router as live_router
 from .api.query import router as query_router
 from .api.runs import router as ingestion_router
-from .db import engine
+from .config import settings
+from .db import SessionLocal, engine
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Optionally fill an empty database with demo runs on first boot (NECTO_SEED=1)."""
+    if settings.seed:
+        try:
+            from .services.demo import seed_if_empty  # imported lazily: keeps boot light
+
+            with SessionLocal() as db:
+                seeded = seed_if_empty(db)
+            if seeded:
+                logger.info("seeded %s demo runs (NECTO_SEED)", len(seeded))
+            else:
+                logger.info("NECTO_SEED is on but the database already has runs; not seeding")
+        except Exception:  # noqa: BLE001 - never block startup on demo data
+            logger.warning("demo seeding failed; continuing without demo data", exc_info=True)
+    yield
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="necto", version=__version__)
+    app = FastAPI(title="necto", version=__version__, lifespan=lifespan)
     app.include_router(ingestion_router)
     app.include_router(graph_router)
     app.include_router(live_router)

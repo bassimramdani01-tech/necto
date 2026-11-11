@@ -873,3 +873,36 @@ stats chunk (406 kB / 114.8 kB gzip) loads only when opened.
 Screenshot: `docs/assets/demo-run.png` (now the README hero).
 
 **Next:** step ⑳ first-boot seed, then ㉑ demo GIF, ㉒ landing README.
+
+---
+
+## 21. Update log — Phase 4, step ⑳ (first-boot seed)
+
+`NECTO_SEED=1` now fills an **empty** database with demo data on startup — the 30-second wow
+with no manual step. Seeding runs inside the FastAPI lifespan, through the normal ingestion path
+(`create_run` → `append_events` → `finish_run`), and only when the runs table is empty.
+
+| File | Change |
+|---|---|
+| `server/necto_server/services/demo.py` | builds the support pipeline (same story as `scripts/demo.py`) and seeds it |
+| `server/necto_server/config.py` | `seed` flag (`NECTO_SEED`) |
+| `server/necto_server/main.py` | lifespan hook; seeding failures are logged and never block startup |
+| `server/tests/test_seed.py` | 9 tests |
+
+**Bug found by running it:** the flag did nothing at first. pydantic-settings maps a field named
+`seed_demo` to `NECTO_SEED_DEMO`, while every doc said `NECTO_SEED`. Renamed the field to `seed`
+and added a test that reads the env var, so the documented name is now the real one.
+
+**Verified end-to-end on a fresh database:**
+
+| Boot | Runs |
+|---|---|
+| first (`NECTO_SEED=1`, empty DB) | **6** (2 ok, 4 error — every third run clean) |
+| second (`NECTO_SEED=1`, populated) | **6** — no duplicates |
+
+Seeded totals: 142 events, $0.08, 16.2K tokens, 4 errors — the dashboard is populated on first
+paint. Regression: server **74 passed**, SDK 51 passed.
+
+Screenshot: `docs/assets/seed-view.png`.
+
+**Next:** step ㉑ demo GIF, ㉒ landing README.

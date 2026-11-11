@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     schema_version: int = 1
     # When set, every /v1 endpoint (including the WebSocket) requires X-API-Key.
     api_key: str | None = None
+    # When true (NECTO_SEED=1), fill an empty database with demo runs on first boot.
+    seed: bool = False
 
 
 settings = Settings()

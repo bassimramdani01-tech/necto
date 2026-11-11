@@ -166,6 +166,18 @@ pip install -e sdk/
 
 No framework required: the SDK is a plain tracer. Framework adapters (LangGraph, OpenAI Agents SDK)
 are the next milestone.
+## First boot: instant demo data
+
+Point necto at an empty database with `NECTO_SEED=1` and it fills itself with six realistic
+support-pipeline runs — including the silent handoff failures — so the dashboard is useful
+immediately. Seeding only happens when the database has no runs, so it is safe to leave on.
+
+```bash
+cd server
+NECTO_SEED=1 uv run uvicorn necto_server.main:app --reload
+```
+
+![seeded runs dashboard](docs/assets/seed-view.png)
 ## Try the demo
 
 No SDK integration needed to see it work. Generate a realistic multi-agent run —
