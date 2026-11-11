@@ -169,6 +169,14 @@ export function RunDetailView({ runId }: { runId: string }) {
 
   const detail = run.data;
   const graph = mode === "replay" && replayGraph ? replayGraph : graphQuery.data;
+  // In replay the header must describe what the graph is showing, not the whole run.
+  const replayStats = mode === "replay" && replayGraph ? replayGraph.stats : null;
+  const shown = {
+    events: replayStats ? replayStats.event_count : detail.event_count,
+    cost: replayStats ? replayStats.cost_usd : detail.cost_usd,
+    tokens: replayStats ? replayStats.tokens : detail.tokens,
+    errors: replayStats ? replayStats.error_count : detail.error_count,
+  };
   const cursorLabel = Math.min(liveCursor, total);
   const timestamps = events.map((event) => event.ts);
   const inspectorEvents = mode === "replay" ? events.slice(0, cursor) : events;
@@ -193,13 +201,17 @@ export function RunDetailView({ runId }: { runId: string }) {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Metric label="Events" value={formatNumber(detail.event_count)} />
-        <Metric label="Cost" value={formatMoney(detail.cost_usd)} />
-        <Metric label="Tokens" value={formatNumber(detail.tokens)} />
+        <Metric
+          label="Events"
+          value={formatNumber(shown.events)}
+          hint={replayStats ? "at replay point" : undefined}
+        />
+        <Metric label="Cost" value={formatMoney(shown.cost)} />
+        <Metric label="Tokens" value={formatNumber(shown.tokens)} />
         <Metric
           label="Errors"
-          value={formatNumber(detail.error_count)}
-          tone={detail.error_count > 0 ? "danger" : "default"}
+          value={formatNumber(shown.errors)}
+          tone={shown.errors > 0 ? "danger" : "default"}
         />
         <Metric label="Framework" value={detail.framework ?? "—"} hint={detail.sdk_version ?? undefined} />
         <Metric

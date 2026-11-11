@@ -15,6 +15,8 @@ export function useRuns(status?: string) {
   return useQuery({
     queryKey: ["runs", status ?? "all"],
     queryFn: () => api.listRuns({ status }),
+    // A running run's status/counters must not go stale while the list is open.
+    refetchInterval: 5_000,
   });
 }
 
@@ -23,6 +25,8 @@ export function useRun(runId: string | null) {
     queryKey: ["run", runId],
     queryFn: () => api.getRun(runId as string),
     enabled: runId !== null,
+    // Poll faster while the run is still going; stop once it finishes.
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 4_000 : false),
   });
 }
 

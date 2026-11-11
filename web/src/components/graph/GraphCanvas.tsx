@@ -231,6 +231,17 @@ export function GraphCanvas(props: {
   onSelectEdge?: (edgeId: string) => void;
   onClearSelection?: () => void;
 }) {
+  if (props.graph.nodes.length === 0) {
+    return (
+      <div className="flex h-[600px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-slate-800 bg-slate-950 px-6 text-center">
+        <p className="text-sm font-medium text-slate-300">No events yet</p>
+        <p className="max-w-sm text-xs text-slate-500">
+          Send events to this run (or start a live one) and the architecture will build here.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <ReactFlowProvider>
       <GraphCanvasInner {...props} />
