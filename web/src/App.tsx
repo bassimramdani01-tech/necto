@@ -2,12 +2,13 @@ import { RecentRuns } from "./components/RecentRuns";
 import { StatusPill } from "./components/StatusPill";
 import { SummaryStrip } from "./components/SummaryStrip";
 import { RunDetailView } from "./views/RunDetailView";
+import { StatsView } from "./views/StatsView";
 import { useUiStore, type View } from "./store/ui";
 
 const navItems: { id: View; label: string; ready: boolean }[] = [
   { id: "runs", label: "Runs", ready: true },
   { id: "topology", label: "Topology", ready: false },
-  { id: "stats", label: "Stats", ready: false },
+  { id: "stats", label: "Stats", ready: true },
 ];
 
 export default function App() {
@@ -57,7 +58,9 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        {selectedRunId ? (
+        {view === "stats" ? (
+          <StatsView />
+        ) : selectedRunId ? (
           <RunDetailView runId={selectedRunId} />
         ) : (
           <>

@@ -11,6 +11,23 @@ interface UiState {
   setStatusFilter: (status: string | null) => void;
 }
 
+function readViewFromUrl(): View {
+  if (typeof window === "undefined") return "runs";
+  const raw = new URLSearchParams(window.location.search).get("view");
+  return raw === "stats" || raw === "topology" ? raw : "runs";
+}
+
+function writeViewToUrl(view: View): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (view === "runs") {
+    url.searchParams.delete("view");
+  } else {
+    url.searchParams.set("view", view);
+  }
+  window.history.replaceState({}, "", url);
+}
+
 // Keep the selected run in the URL so a run view can be linked to and reloaded.
 function readRunFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -33,10 +50,13 @@ function writeRunToUrl(runId: string | null): void {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  view: "runs",
+  view: readViewFromUrl(),
   selectedRunId: readRunFromUrl(),
   statusFilter: null,
-  setView: (view) => set({ view }),
+  setView: (view) => {
+    writeViewToUrl(view);
+    set({ view });
+  },
   selectRun: (runId) => {
     writeRunToUrl(runId);
     set({ selectedRunId: runId });

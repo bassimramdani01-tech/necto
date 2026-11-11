@@ -231,6 +231,11 @@ Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production bu
 
 ![inspector open on the router node, showing its events](docs/assets/inspector-view.png)
 
+A stats dashboard covers cost, tokens and latency per model and per agent, the event mix, and
+per-edge failure rates:
+
+![stats dashboard](docs/assets/stats-view.png)
+
 The dashboard lists runs and opens a run detail page with the interactive architecture graph,
 a **live indicator** (events stream in over a WebSocket and the graph updates without a reload),
 a **replay scrubber** that rebuilds the graph at any point in the run, and an **inspector** —

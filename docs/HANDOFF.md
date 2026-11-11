@@ -796,3 +796,48 @@ dash for events that carry no latency (handoffs).
 Screenshot: `docs/assets/inspector-view.png`.
 
 **Next:** step ⑱ stats dashboard (Recharts), which completes Phase 3.
+
+---
+
+## 19. Update log — Phase 3, step ⑱ (stats dashboard). Phase 3 complete. F6 done.
+
+`StatsView` (Recharts 3.10.1) with a run-scope selector (all runs ↔ one run):
+
+| Panel | Content |
+|---|---|
+| Spend by model | total `cost_usd` per model |
+| Model calls | calls per model (tokens on hover) |
+| Calls by agent | horizontal bars per agent |
+| Average LLM latency | avg ms per model |
+| Events by type | donut of the event mix |
+| Edge failure rate | edges with errors + rate bars |
+| Busiest connections | topology table (scoped to the run when one is selected) |
+
+Views are now URL-addressable: `?view=stats` (and `?run=<id>` scopes it).
+
+**Rerun found two real bugs:**
+
+1. **No bars rendered at all.** Recharts animates bars from zero height and the entry animation never
+   completed under headless virtual time — every chart was empty while the axes looked fine. Fixed by
+   `isAnimationActive={false}`; it also makes the dashboard paint instantly.
+2. **Calls and tokens shared one Y axis**, so 12 calls rendered as a 1-pixel bar next to 3,400 tokens.
+   Split into a calls-only chart (tokens now in the tooltip).
+
+Also fixed: the edge panels ignored the run scope (they always showed global topology) and the first
+metric duplicated "events" when scoped.
+
+**Regression rerun:** server **64 passed**, SDK **51 passed, 1 skipped**, `pnpm build` clean
+(recharts adds weight: 896 kB JS / 269 kB gzip — code-split the stats route before release).
+
+### Phase 3 summary (steps ⑬–⑱) — DONE
+
+| Step | Deliverable |
+|---|---|
+| ⑬ | Vite/React/Tailwind app shell, typed API client, proxy incl. WebSocket |
+| ⑭ | Run detail: metrics, URL-addressable runs |
+| ⑮ | Interactive architecture graph (React Flow): handoff-ordered layout, directional edges |
+| ⑯ | Live WebSocket updates + replay scrubber with client-side projection |
+| ⑰ | Inspector for nodes/edges with matching events and raw payloads |
+| ⑱ | Stats dashboard: cost/tokens/latency per model & agent, event mix, edge failure rates |
+
+**Next: Phase 4 — demo generator, first-boot seed, demo GIF, landing polish.**

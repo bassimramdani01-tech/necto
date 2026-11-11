@@ -53,6 +53,14 @@ export function useRunEvents(runId: string | null) {
   });
 }
 
+export function useStats(runId?: string | null) {
+  return useQuery({
+    queryKey: ["stats", runId ?? "global"],
+    queryFn: () => api.getStats(runId ?? undefined),
+    refetchInterval: 10_000,
+  });
+}
+
 export function useGlobalStats() {
   return useQuery({
     queryKey: ["stats", "global"],
