@@ -963,3 +963,35 @@ The README was rewritten as a landing page and its claims audited against realit
 | ㉒ | Landing README with badges, comparison, quickstart, gallery |
 
 **Next: Phase 5 — CI (GitHub Actions), PyPI + GitHub release, community rails, launch.**
+
+---
+
+## 24. Polish pass — Tier 1 (pre-release manual-run fixes)
+
+Audited the existing app for dead ends and unpolished edges, then fixed them in two batches.
+
+**Batch 1 — bugs & dead ends**
+
+| Fix | Before | After |
+|---|---|---|
+| Runs list auto-refresh | a running run stayed "running" until reload | polls every 5 s + invalidates on WebSocket events |
+| Status filters | `statusFilter` existed in the store but no UI used it | All / Running / OK / Error chips, wired to `?status=`, URL-addressable |
+| Replay metrics | header showed whole-run totals while the graph was at event K | header derives events/cost/tokens/errors from the projected graph, with an "at replay point" hint |
+| Empty graph | a run with no events rendered a void | "No events yet" placeholder |
+| Render errors | one exception blanked the app | `ErrorBoundary` with a reload path |
+
+**Batch 2 — accessibility + topology**
+
+- Global focus-visible rings, `aria-current` on nav, `aria-pressed` on filters/mode toggles,
+  `aria-label` on the graph canvas, keyboard-reachable run links, and a
+  `prefers-reduced-motion` override for animated edges.
+- **Topology view implemented**: the aggregate map across all runs (nodes/edges/events/cost/errors),
+  reusing `GraphCanvas`. The "soon" badge is gone.
+- Themed scrollbars for the dark UI.
+
+**Verified by screenshot:** filtered runs (2 of 2 error runs), replay at event 6 with matching header
+totals (6 events / $0.00030 / 229 tokens), empty-run placeholder, and topology (17 nodes / 24 edges /
+323 events across 27 runs).
+
+**Next:** Tier 2 polish (pagination, search/sort, absolute timestamps, copy-JSON, edge tooltips,
+favicon, responsive layout) and Tier 3 (Docker self-host, frontend tests, SDK 429 handling).

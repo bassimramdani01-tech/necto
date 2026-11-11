@@ -53,6 +53,7 @@ export function Timeline({
       <div className="flex overflow-hidden rounded-md border border-slate-700 text-xs">
         <button
           type="button"
+          aria-pressed={mode === "live"}
           onClick={() => onSetMode("live")}
           className={`px-3 py-1.5 transition-colors ${
             mode === "live" ? "bg-slate-700 text-slate-100" : "text-slate-400 hover:bg-slate-800"
@@ -62,6 +63,7 @@ export function Timeline({
         </button>
         <button
           type="button"
+          aria-pressed={mode === "replay"}
           onClick={() => onSetMode("replay")}
           className={`px-3 py-1.5 transition-colors ${
             mode === "replay" ? "bg-slate-700 text-slate-100" : "text-slate-400 hover:bg-slate-800"

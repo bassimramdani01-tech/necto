@@ -86,7 +86,13 @@ export function RecentRuns() {
                   className="cursor-pointer transition-colors hover:bg-slate-900/60"
                 >
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-slate-200">{run.name ?? "untitled run"}</div>
+                    <button
+                      type="button"
+                      onClick={() => selectRun(run.id)}
+                      className="block max-w-[18rem] truncate text-left font-medium text-slate-200 hover:text-sky-300"
+                    >
+                      {run.name ?? "untitled run"}
+                    </button>
                     <div className="font-mono text-[11px] text-slate-500">{shortId(run.id)}</div>
                   </td>
                   <td className="px-4 py-2.5">

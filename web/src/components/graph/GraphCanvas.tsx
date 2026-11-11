@@ -286,7 +286,11 @@ function GraphCanvasInner({
   }, [graph, nodes, highlightEdgeIds, selectedId]);
 
   return (
-    <div className="h-[600px] w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+    <div
+      className="h-[600px] w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950"
+      role="img"
+      aria-label={`architecture graph: ${nodes.length} nodes, ${edges.length} edges`}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}

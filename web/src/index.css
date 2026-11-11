@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: dark;
+  scrollbar-color: #334155 #020617;
 }
 
 html,
@@ -15,6 +16,26 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: #020617;
   color: #e2e8f0;
+}
+
+/* Keyboard users must be able to see where they are. */
+:where(button, a, input, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect users who ask for less motion (animated handoff edges, fit transitions). */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__edge.animated path {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }
 
 /* React Flow ships a light theme; make its chrome match the app. */

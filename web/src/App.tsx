@@ -4,6 +4,7 @@ import { RecentRuns } from "./components/RecentRuns";
 import { StatusPill } from "./components/StatusPill";
 import { SummaryStrip } from "./components/SummaryStrip";
 import { RunDetailView } from "./views/RunDetailView";
+import { TopologyView } from "./views/TopologyView";
 import { useUiStore, type View } from "./store/ui";
 
 // Recharts is heavy; the dashboard is not on the critical path, so load it on demand.
@@ -13,7 +14,7 @@ const StatsView = lazy(() =>
 
 const navItems: { id: View; label: string; ready: boolean }[] = [
   { id: "runs", label: "Runs", ready: true },
-  { id: "topology", label: "Topology", ready: false },
+  { id: "topology", label: "Topology", ready: true },
   { id: "stats", label: "Stats", ready: true },
 ];
 
@@ -30,7 +31,7 @@ export default function App() {
           <div className="text-[11px] text-slate-500">AI architecture, visualized</div>
         </div>
 
-        <nav className="flex flex-col gap-0.5 px-3">
+        <nav aria-label="Main" className="flex flex-col gap-0.5 px-3">
           {navItems.map((item) => {
             const active = view === item.id;
             return (
@@ -38,6 +39,7 @@ export default function App() {
                 key={item.id}
                 type="button"
                 disabled={!item.ready}
+                aria-current={active ? "page" : undefined}
                 onClick={() => setView(item.id)}
                 className={`flex items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
                   active
@@ -70,6 +72,8 @@ export default function App() {
           >
             <StatsView />
           </Suspense>
+        ) : view === "topology" ? (
+          <TopologyView />
         ) : selectedRunId ? (
           <RunDetailView runId={selectedRunId} />
         ) : (
