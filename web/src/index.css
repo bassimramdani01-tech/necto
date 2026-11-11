@@ -50,3 +50,13 @@ body {
 .react-flow__edge-textbg {
   fill: #0f172a;
 }
+
+/* The inspector reflects the selected element — make the link obvious. */
+.react-flow__node.selected > div {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3px !important;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { GRAPH_LEGEND, GraphCanvas } from "../components/graph/GraphCanvas";
+import { Inspector, type Selection } from "../components/Inspector";
 import { Metric } from "../components/Metric";
 import { Timeline } from "../components/Timeline";
 import { formatDuration, formatMoney, formatNumber, formatRelative } from "../lib/format";
@@ -62,6 +63,27 @@ function readReplayPoint(): number | null {
   return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : null;
 }
 
+function readSelectionFromUrl(): Selection | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const node = params.get("node");
+  if (node) return { kind: "node", id: node };
+  const edge = params.get("edge");
+  if (edge) return { kind: "edge", id: edge };
+  return null;
+}
+
+function writeSelectionToUrl(selection: Selection | null): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("node");
+  url.searchParams.delete("edge");
+  if (selection) {
+    url.searchParams.set(selection.kind, selection.id);
+  }
+  window.history.replaceState({}, "", url);
+}
+
 export function RunDetailView({ runId }: { runId: string }) {
   const selectRun = useUiStore((state) => state.selectRun);
   const run = useRun(runId);
@@ -76,6 +98,7 @@ export function RunDetailView({ runId }: { runId: string }) {
   const [mode, setMode] = useState<Mode>("live");
   const [cursor, setCursor] = useState(0);
   const [replayInitialised, setReplayInitialised] = useState(false);
+  const [selection, setSelection] = useState<Selection | null>(readSelectionFromUrl);
 
   // Deep link: ?run=<id>&at=<n> opens replay at a specific event.
   useEffect(() => {
@@ -87,6 +110,23 @@ export function RunDetailView({ runId }: { runId: string }) {
     }
     setReplayInitialised(true);
   }, [replayInitialised, total]);
+
+  // Escape closes the inspector.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelection(null);
+        writeSelectionToUrl(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const selectEntity = (next: Selection | null) => {
+    setSelection(next);
+    writeSelectionToUrl(next);
+  };
 
   // In live mode the cursor is simply the end of the event list — no state to race with.
   const liveCursor = mode === "live" ? total : cursor;
@@ -131,6 +171,7 @@ export function RunDetailView({ runId }: { runId: string }) {
   const graph = mode === "replay" && replayGraph ? replayGraph : graphQuery.data;
   const cursorLabel = Math.min(liveCursor, total);
   const timestamps = events.map((event) => event.ts);
+  const inspectorEvents = mode === "replay" ? events.slice(0, cursor) : events;
 
   return (
     <div className="px-8 py-6">
@@ -197,19 +238,39 @@ export function RunDetailView({ runId }: { runId: string }) {
           }}
         />
 
-        {graphQuery.isLoading && mode === "live" ? (
-          <div className="flex h-[600px] items-center justify-center rounded-lg border border-slate-800 text-sm text-slate-500">
-            Loading graph…
-          </div>
-        ) : graph ? (
-          <GraphCanvas graph={graph} highlightEdgeIds={highlightEdgeIds} />
-        ) : (
-          <div className="rounded-lg border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
-            Could not load the graph for this run.
-          </div>
-        )}
+        <div className="flex flex-col gap-4 xl:flex-row">
+          <div className="min-w-0 flex-1 space-y-3">
+            {graphQuery.isLoading && mode === "live" ? (
+              <div className="flex h-[600px] items-center justify-center rounded-lg border border-slate-800 text-sm text-slate-500">
+                Loading graph…
+              </div>
+            ) : graph ? (
+              <GraphCanvas
+                graph={graph}
+                highlightEdgeIds={highlightEdgeIds}
+                selectedId={selection?.id ?? null}
+                onSelectNode={(id) => selectEntity({ kind: "node", id })}
+                onSelectEdge={(id) => selectEntity({ kind: "edge", id })}
+                onClearSelection={() => selectEntity(null)}
+              />
+            ) : (
+              <div className="rounded-lg border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
+                Could not load the graph for this run.
+              </div>
+            )}
 
-        <Legend />
+            <Legend />
+          </div>
+
+          {selection && graph ? (
+            <Inspector
+              selection={selection}
+              graph={graph}
+              events={inspectorEvents}
+              onClose={() => selectEntity(null)}
+            />
+          ) : null}
+        </div>
       </section>
     </div>
   );

@@ -75,6 +75,12 @@ export function projectGraph(events: EventOut[], runId: string | null): GraphRes
     }
 
     if (event.type === "llm_call") {
+      // The server attributes a model call to both ends: the calling agent and the
+      // model. Totals are summed from edges, so this does not double count.
+      if (from) {
+        from.tokens += tokens;
+        from.cost_usd += cost;
+      }
       if (to) {
         to.tokens += tokens;
         to.cost_usd += cost;

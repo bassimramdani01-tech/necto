@@ -20,6 +20,10 @@ function readRunFromUrl(): string | null {
 function writeRunToUrl(runId: string | null): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
+  // Changing run clears per-run view state (replay point / inspector selection).
+  url.searchParams.delete("at");
+  url.searchParams.delete("node");
+  url.searchParams.delete("edge");
   if (runId) {
     url.searchParams.set("run", runId);
   } else {

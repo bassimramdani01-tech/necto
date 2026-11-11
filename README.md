@@ -229,9 +229,12 @@ Run the API alongside it (`uv run uvicorn necto_server.main:app`). Production bu
 
 ![replay mode scrubbing back through a run](docs/assets/replay-view.png)
 
+![inspector open on the router node, showing its events](docs/assets/inspector-view.png)
+
 The dashboard lists runs and opens a run detail page with the interactive architecture graph,
 a **live indicator** (events stream in over a WebSocket and the graph updates without a reload),
-and a **replay scrubber** that rebuilds the graph at any point in the run:
+a **replay scrubber** that rebuilds the graph at any point in the run, and an **inspector** —
+click any node or edge to see its metrics and the exact events behind it, with raw payloads:
 agents in the left column in handoff order, models and tools aligned to the agent that used
 them, weighted edges coloured by call type, and hover labels showing counts.
 ## API (v1)

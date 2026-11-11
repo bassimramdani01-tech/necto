@@ -14,6 +14,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { formatCompact, formatMoney } from "../../lib/format";
+import { nodeLabel } from "../../lib/graph";
 import type { GraphEdge, GraphNode, GraphResponse } from "../../lib/types";
 
 const KIND_ORDER = ["agent", "model", "tool", "state", "external"];
@@ -40,12 +41,7 @@ interface NodeData extends Record<string, unknown> {
   node: GraphNode;
 }
 
-/** Nodes inferred from a ref (a handoff target, say) have no payload name yet. */
-function displayName(node: GraphNode): string {
-  if (node.name) return node.name;
-  const parts = node.id.split(":");
-  return parts.length > 1 ? (parts[parts.length - 1] as string) : node.id;
-}
+// node labelling lives in lib/graph so the inspector can share it
 
 function NectoNode({ data }: NodeProps) {
   const node = (data as NodeData).node;
@@ -57,7 +53,7 @@ function NectoNode({ data }: NodeProps) {
       <Handle id="target-right" type="target" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-slate-600" />
       <div className="flex items-center justify-between gap-2">
         <span className="max-w-[130px] truncate text-sm font-medium text-slate-100">
-          {displayName(node)}
+          {nodeLabel(node)}
         </span>
         <span className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${style.chip}`}>
           {node.kind}
@@ -139,7 +135,7 @@ function orderAgents(agents: GraphNode[], edges: GraphEdge[]): GraphNode[] {
   return [...ordered, ...rest];
 }
 
-function layout(nodes: GraphNode[], edges: GraphEdge[]): Node[] {
+function layout(nodes: GraphNode[], edges: GraphEdge[], selectedId: string | null): Node[] {
   const agents = orderAgents(
     nodes.filter((node) => node.kind === "agent"),
     edges,
@@ -165,6 +161,7 @@ function layout(nodes: GraphNode[], edges: GraphEdge[]): Node[] {
       type: "necto",
       position: { x: 40 + spot.column * 300, y: 40 + spot.row * 140 },
       data: { node } as NodeData,
+      selected: node.id === selectedId,
     });
   };
 
@@ -194,6 +191,7 @@ function buildEdges(
   graph: GraphResponse,
   columnOf: Map<string, number>,
   highlight: ReadonlySet<string>,
+  selectedId: string | null,
 ): Edge[] {
   return graph.edges.map((edge) => {
     const style = EDGE_STYLE[edge.kind] ?? { color: "#64748b", animated: false };
@@ -215,6 +213,7 @@ function buildEdges(
       labelBgBorderRadius: 4,
       style: { stroke: style.color, strokeWidth: isHot ? 3 : 1.6 },
       markerEnd: { type: MarkerType.ArrowClosed, color: style.color, width: 16, height: 16 },
+      selected: edge.id === selectedId,
     } as Edge;
   });
 }
@@ -222,18 +221,29 @@ function buildEdges(
 export function GraphCanvas({
   graph,
   highlightEdgeIds = NO_HIGHLIGHT,
+  selectedId = null,
+  onSelectNode,
+  onSelectEdge,
+  onClearSelection,
 }: {
   graph: GraphResponse;
   highlightEdgeIds?: ReadonlySet<string>;
+  selectedId?: string | null;
+  onSelectNode?: (nodeId: string) => void;
+  onSelectEdge?: (edgeId: string) => void;
+  onClearSelection?: () => void;
 }) {
-  const nodes = useMemo(() => layout(graph.nodes, graph.edges), [graph.nodes, graph.edges]);
+  const nodes = useMemo(
+    () => layout(graph.nodes, graph.edges, selectedId),
+    [graph.nodes, graph.edges, selectedId],
+  );
   const edges = useMemo(() => {
     const columnOf = new Map<string, number>();
     for (const node of nodes) {
       columnOf.set(node.id, Math.round((node.position.x - 40) / 300));
     }
-    return buildEdges(graph, columnOf, highlightEdgeIds);
-  }, [graph, nodes, highlightEdgeIds]);
+    return buildEdges(graph, columnOf, highlightEdgeIds, selectedId);
+  }, [graph, nodes, highlightEdgeIds, selectedId]);
 
   return (
     <div className="h-[600px] w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
@@ -246,7 +256,10 @@ export function GraphCanvas({
         minZoom={0.2}
         maxZoom={1.6}
         nodesConnectable={false}
-        edgesFocusable={false}
+        elementsSelectable
+        onNodeClick={(_, node) => onSelectNode?.(node.id)}
+        onEdgeClick={(_, edge) => onSelectEdge?.(edge.id)}
+        onPaneClick={() => onClearSelection?.()}
       >
         <Background color="#1e293b" gap={20} />
         <Controls showInteractive={false} position="bottom-left" />

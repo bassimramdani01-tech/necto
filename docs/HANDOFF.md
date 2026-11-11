@@ -762,3 +762,37 @@ A Live/Replay toggle plus a range slider scrubs through every event; the header 
 Screenshots: `docs/assets/live-view.png`, `docs/assets/replay-view.png`.
 
 **Next:** step ⑰ inspector panel (click node/edge → details), ⑱ stats dashboard.
+
+---
+
+## 18. Update log — Phase 3, step ⑰ (inspector). F4 done.
+
+Clicking a node or an edge opens an inspector panel beside the graph:
+
+- **Node** — id, kind, framework, model/provider, events, tokens, cost, errors, first/last seen,
+  plus every event that mentions the node (`from_ref` or `to_ref`).
+- **Edge** — kind, from/to labels, calls, tokens, cost, latency (a dash when the event type has none),
+  error count/rate, first/last seen, plus the exact events that produced the edge.
+- Each event row expands to its raw payload JSON.
+- Selected elements get a sky-blue outline so the graph and the panel stay linked.
+- The selection is URL-addressable (`?node=agent:router`, `?edge=...`), the panel closes on the ×
+  or Escape, and it respects the replay position (events are filtered to the chosen point).
+
+**Rerun found two real bugs:**
+
+1. **Replay lost model-call cost on agents.** The client projection attributed an `llm_call`'s tokens
+   and cost only to the model node, while the server attributes them to both ends. Replay showed
+   `router: tokens 0 / $0` instead of `907 / $0.00210`. Fixed in `projectGraph.ts` (totals are summed
+   from edges, so this does not double count).
+2. **Stale per-run URL state.** Switching runs left `?at=`, `?node=` or `?edge=` behind, so opening
+   another run could deep-link into a stale selection. Run navigation now clears those params.
+
+Polish applied from the screenshots: selected-element outline, and `0 ms` latency replaced with a
+dash for events that carry no latency (handoffs).
+
+**Regression rerun:** server **64 passed**, SDK **51 passed, 1 skipped**, `pnpm build` clean
+(118 modules, 487 kB JS / 154 kB gzip).
+
+Screenshot: `docs/assets/inspector-view.png`.
+
+**Next:** step ⑱ stats dashboard (Recharts), which completes Phase 3.
