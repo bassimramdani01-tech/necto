@@ -8,7 +8,7 @@
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-![necto showing a run where a silent handoff failure is visible](docs/assets/demo-run.png)
+![necto: a live multi-agent run building, rewound, and inspected](docs/assets/demo.gif)
 
 ---
 
@@ -192,6 +192,11 @@ python scripts/demo.py --clean            # failure-free runs
 ```
 
 Point it elsewhere with `--endpoint` / `--api-key`. Then open <http://localhost:5173>.
+
+![a demo run with the erroring edge in red](docs/assets/demo-run.png)
+
+Regenerate the GIF above with `python scripts/demo_gif.py` (needs Edge + Pillow; no Playwright
+or ffmpeg required).
 ## Development
 
 Full setup: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Background,
   Controls,
@@ -6,6 +6,8 @@ import {
   MarkerType,
   Position,
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeProps,
@@ -221,7 +223,22 @@ function buildEdges(
   });
 }
 
-export function GraphCanvas({
+export function GraphCanvas(props: {
+  graph: GraphResponse;
+  highlightEdgeIds?: ReadonlySet<string>;
+  selectedId?: string | null;
+  onSelectNode?: (nodeId: string) => void;
+  onSelectEdge?: (edgeId: string) => void;
+  onClearSelection?: () => void;
+}) {
+  return (
+    <ReactFlowProvider>
+      <GraphCanvasInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function GraphCanvasInner({
   graph,
   highlightEdgeIds = NO_HIGHLIGHT,
   selectedId = null,
@@ -236,6 +253,15 @@ export function GraphCanvas({
   onSelectEdge?: (edgeId: string) => void;
   onClearSelection?: () => void;
 }) {
+  const { fitView } = useReactFlow();
+
+  // A live run grows the graph; keep everything in frame instead of letting it drift off-canvas.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fitView({ padding: 0.18, duration: 220 });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [fitView, graph.nodes.length, graph.edges.length]);
   const nodes = useMemo(
     () => layout(graph.nodes, graph.edges, selectedId),
     [graph.nodes, graph.edges, selectedId],

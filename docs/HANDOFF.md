@@ -906,3 +906,34 @@ paint. Regression: server **74 passed**, SDK 51 passed.
 Screenshot: `docs/assets/seed-view.png`.
 
 **Next:** step ㉑ demo GIF, ㉒ landing README.
+
+---
+
+## 22. Update log — Phase 4, step ㉑ (demo GIF)
+
+`scripts/demo_gif.py` renders `docs/assets/demo.gif` **without Playwright and without ffmpeg** —
+neither is installed here and PyPI's file host is blocked. Instead:
+
+1. it starts `scripts/demo.py --delay` so a run streams in live,
+2. it drives the installed **Microsoft Edge** over the DevTools Protocol (a ~90-line stdlib
+   WebSocket client — the only dependency is Pillow for GIF assembly),
+3. it captures PNG frames while the graph builds, then a second segment with the run rewound and
+   the **inspector open**,
+4. it assembles a 6 fps, 720 px animated GIF with Pillow (1.17 MB, 31 frames, 720×607).
+
+Usage: `python scripts/demo_gif.py` (server + `pnpm dev` must be running). Requires Edge and
+Pillow; flags cover `--fps`, `--width`, `--event-delay`, `--live-seconds`, `--out`.
+
+**Two real bugs found while making it:**
+
+1. **`--delay` never streamed.** `scripts/demo.py` created the SDK with `background=False`, so
+   events buffered until the run finished — the UI showed 0 events for the whole capture and then
+   everything at once. It now enables the background flusher when a delay is set.
+2. **The graph drifted off-canvas as it grew.** `fitView` only ran on mount, so new nodes landed
+   outside the viewport. `GraphCanvas` now re-fits (220 ms animation) whenever the node/edge count
+   changes — which also makes watching a live run much nicer.
+
+Also: the first captures lost their opening seconds to Vite compiling the run-detail route; the
+script now warms that route before starting the demo.
+
+**Next:** step ㉒ landing README (badges, why-necto, quickstart polish).

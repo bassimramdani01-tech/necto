@@ -204,7 +204,15 @@ def generate_run(
 
 def main() -> int:
     args = parse_args()
-    necto = Necto(endpoint=args.endpoint, api_key=args.api_key, background=False, framework="necto-demo")
+    # With --delay we want events to reach the server (and the UI) while the run is happening,
+    # so let the tracer's background flusher ship each batch. Without a delay one flush at the
+    # end is enough.
+    necto = Necto(
+        endpoint=args.endpoint,
+        api_key=args.api_key,
+        background=args.delay > 0,
+        framework="necto-demo",
+    )
 
     print(f"generating {args.runs} run(s) against {args.endpoint}")
     if args.delay > 0:
