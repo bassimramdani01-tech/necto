@@ -365,3 +365,89 @@ def test_run_list_total_respects_status_filter(client):
     response = client.get("/v1/runs", params={"status": "running"})
     assert response.headers["X-Total-Count"] == "1"
     assert [run["id"] for run in response.json()] == [running]
+
+
+def test_run_list_search_matches_name(client):
+    _create_run(client, "alpha-ticket")
+    _create_run(client, "beta-ticket")
+
+    response = client.get("/v1/runs", params={"q": "alpha"})
+    assert response.status_code == 200
+    assert [run["name"] for run in response.json()] == ["alpha-ticket"]
+    assert response.headers["X-Total-Count"] == "1"
+
+
+def test_run_list_filters_by_framework(client):
+    client.post("/v1/runs", json={"name": "lg-run", "meta": {"framework": "langgraph"}})
+    client.post("/v1/runs", json={"name": "otel-run", "meta": {"framework": "otel"}})
+
+    body = client.get("/v1/runs", params={"framework": "otel"}).json()
+    assert [run["name"] for run in body] == ["otel-run"]
+
+
+def test_run_list_sorts_by_cost(client):
+    _seed(client, "expensive")  # cost 0.0053
+    cheap_id = _create_run(client, "cheap")
+    _post(
+        client,
+        cheap_id,
+        [
+            _ev(
+                "llm_call",
+                {
+                    "provider": "openai",
+                    "model": "gpt-4o-mini",
+                    "input_tokens": 10,
+                    "output_tokens": 5,
+                    "cost_usd": 0.0001,
+                    "latency_ms": 50,
+                },
+                from_="agent:a",
+                to="model:openai:gpt-4o-mini",
+            )
+        ],
+    )
+
+    body = client.get("/v1/runs", params={"sort": "cost"}).json()
+    assert [run["name"] for run in body] == ["expensive", "cheap"]
+
+
+def test_run_list_sorts_by_events(client):
+    _seed(client, "many")  # 7 events
+    few_id = _create_run(client, "few")
+    _post(client, few_id, [_ev("agent_start", {"name": "Solo"}, to="agent:solo")])
+
+    body = client.get("/v1/runs", params={"sort": "events"}).json()
+    assert [run["name"] for run in body] == ["many", "few"]
+
+
+def test_invalid_sort_is_rejected(client):
+    assert client.get("/v1/runs", params={"sort": "bogus"}).status_code == 422
+
+
+def test_frameworks_endpoint_lists_distinct_frameworks(client):
+    _create_run(client, "plain")  # meta.framework = pytest
+    client.post("/v1/runs", json={"name": "graph", "meta": {"framework": "langgraph"}})
+
+    response = client.get("/v1/frameworks")
+    assert response.status_code == 200
+    frameworks = response.json()
+    assert "langgraph" in frameworks
+    assert "pytest" in frameworks
+    assert len(frameworks) == len(set(frameworks))
+
+
+def test_stats_run_count_includes_runs_without_events(client):
+    _create_run(client, "no-events-yet")
+    _seed(client, "with-events")
+
+    stats = client.get("/v1/stats").json()
+    assert stats["run_count"] == 2
+    assert stats["event_count"] == 7
+
+
+def test_stats_run_count_for_single_run(client):
+    run_id = _create_run(client, "empty-run")
+    stats = client.get("/v1/stats", params={"run_id": run_id}).json()
+    assert stats["run_count"] == 1
+    assert stats["event_count"] == 0

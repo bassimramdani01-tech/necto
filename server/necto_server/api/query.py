@@ -24,13 +24,26 @@ router = APIRouter(prefix="/v1", tags=["query"], dependencies=[Depends(require_a
 def list_runs(
     response: Response,
     status: str | None = None,
+    q: str | None = Query(None, max_length=200, description="case-insensitive name search"),
+    framework: str | None = Query(None, max_length=64),
+    sort: str = Query("recent", pattern="^(recent|oldest|name|cost|events)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[RunSummary]:
     # Total (before pagination) so clients can render "page 2 of 7".
-    response.headers["X-Total-Count"] = str(queries.count_runs(db, status))
-    return queries.list_runs(db, status=status, limit=limit, offset=offset)
+    response.headers["X-Total-Count"] = str(
+        queries.count_runs(db, status, q=q, framework=framework)
+    )
+    return queries.list_runs(
+        db, status=status, limit=limit, offset=offset, q=q, framework=framework, sort=sort
+    )
+
+
+@router.get("/frameworks", response_model=list[str])
+def list_frameworks(db: Session = Depends(get_db)) -> list[str]:
+    """Distinct frameworks seen on runs — used by the dashboard's filter."""
+    return queries.list_frameworks(db)
 
 
 @router.get("/runs/{run_id}", response_model=RunDetail)

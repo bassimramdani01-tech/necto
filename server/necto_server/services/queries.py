@@ -78,22 +78,85 @@ def _summary(run: Run, counts: RunCounts) -> RunSummary:
 _EMPTY_COUNTS: RunCounts = (0, 0.0, 0, 0)
 
 
-def list_runs(db: Session, status: str | None, limit: int, offset: int) -> list[RunSummary]:
-    stmt = select(Run).order_by(Run.started_at.desc(), Run.id.desc()).limit(limit).offset(offset)
+SORT_OPTIONS = frozenset({"recent", "oldest", "name", "cost", "events"})
+
+
+def _run_filters(status: str | None, q: str | None, framework: str | None) -> list:
+    clauses: list = []
     if status:
-        stmt = stmt.where(Run.status == status)
+        clauses.append(Run.status == status)
+    if q:
+        clauses.append(Run.name.ilike(f"%{q}%"))
+    if framework:
+        clauses.append(Run.framework == framework)
+    return clauses
 
-    runs = db.execute(stmt).scalars().all()
-    aggregates = _run_event_aggregates(db, [run.id for run in runs])
-    return [_summary(run, aggregates.get(run.id, _EMPTY_COUNTS)) for run in runs]
+
+def list_runs(
+    db: Session,
+    status: str | None,
+    limit: int,
+    offset: int,
+    q: str | None = None,
+    framework: str | None = None,
+    sort: str = "recent",
+) -> list[RunSummary]:
+    stmt = select(Run)
+    for clause in _run_filters(status, q, framework):
+        stmt = stmt.where(clause)
+
+    if sort in {"cost", "events"}:
+        # Order by an event aggregate; one row per run, so no duplication.
+        aggregates = (
+            select(
+                Event.run_id.label("run_id"),
+                cost_sum().label("cost_usd"),
+                func.count().label("event_count"),
+            )
+            .group_by(Event.run_id)
+            .subquery()
+        )
+        stmt = stmt.join(aggregates, aggregates.c.run_id == Run.id, isouter=True)
+        ordering = aggregates.c.cost_usd if sort == "cost" else aggregates.c.event_count
+        stmt = stmt.order_by(ordering.desc().nullslast(), Run.started_at.desc(), Run.id.desc())
+    elif sort == "oldest":
+        stmt = stmt.order_by(Run.started_at.asc(), Run.id.asc())
+    elif sort == "name":
+        stmt = stmt.order_by(Run.name.asc().nullslast(), Run.started_at.desc(), Run.id.desc())
+    else:
+        stmt = stmt.order_by(Run.started_at.desc(), Run.id.desc())
+
+    runs = db.execute(stmt.limit(limit).offset(offset)).scalars().all()
+    aggregates_by_run = _run_event_aggregates(db, [run.id for run in runs])
+    return [_summary(run, aggregates_by_run.get(run.id, _EMPTY_COUNTS)) for run in runs]
 
 
-def count_runs(db: Session, status: str | None) -> int:
-    """Total number of runs (before pagination), honouring the status filter."""
+def count_runs(
+    db: Session,
+    status: str | None,
+    q: str | None = None,
+    framework: str | None = None,
+) -> int:
+    """Total number of runs (before pagination), honouring every filter."""
     stmt = select(func.count()).select_from(Run)
-    if status:
-        stmt = stmt.where(Run.status == status)
+    for clause in _run_filters(status, q, framework):
+        stmt = stmt.where(clause)
     return int(db.execute(stmt).scalar() or 0)
+
+
+def list_frameworks(db: Session) -> list[str]:
+    """Distinct frameworks seen on runs, for the UI's filter select."""
+    rows = (
+        db.execute(
+            select(Run.framework)
+            .where(Run.framework.is_not(None))
+            .distinct()
+            .order_by(Run.framework.asc())
+        )
+        .scalars()
+        .all()
+    )
+    return [framework for framework in rows if framework]
 
 
 def get_run(db: Session, run_id: UUID) -> RunDetail | None:
@@ -159,7 +222,6 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
             func.coalesce(func.sum(case((Event.type == "error", 1), else_=0)), 0).label(
                 "error_count"
             ),
-            func.count(func.distinct(Event.run_id)).label("run_count"),
             func.avg(case((Event.type == "llm_call", latency_value()), else_=None)).label(
                 "avg_latency"
             ),
@@ -198,11 +260,18 @@ def build_stats(db: Session, run_id: UUID | None) -> StatsResponse | None:
         .order_by(Event.type)
     ).all()
 
+    # Count runs, not "runs that happen to have events" — otherwise runs that are still
+    # empty disappear from the dashboard while showing up in the runs list.
+    if run_id is not None:
+        run_count = 1
+    else:
+        run_count = int(db.execute(select(func.count()).select_from(Run)).scalar() or 0)
+
     return StatsResponse(
         scope="run" if run_id is not None else "all",
         run_id=run_id,
         event_count=int(totals.event_count or 0),
-        run_count=int(totals.run_count or 0),
+        run_count=run_count,
         cost_usd=round(float(totals.cost_usd or 0), 8),
         tokens=int(totals.tokens or 0),
         error_count=int(totals.error_count or 0),

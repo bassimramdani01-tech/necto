@@ -398,27 +398,27 @@ All four confirmed bugs from §5.1 are fixed, each with regression tests. **Test
 
 | Bug | Fix | Where |
 |---|---|---|
-| **B1** stats 500 on null refs | ${BT}by_model${BT}/${BT}by_agent${BT} exclude rows with NULL refs — legacy/bad rows can no longer 500 the endpoint | ${BT}services/queries.py${BT} |
-| **B2** refs not validated | Strict ${BT}kind:id${BT} grammar, allowed kinds, and per-type presence/kind rules from SCHEMA.md §4–5 → ${BT}422${BT} with precise messages | ${BT}schemas/events.py${BT} + ${BT}services/ingestion.py${BT} |
-| **B3** framework/sdk_version never stored | Populated from create-time meta **and** backfilled from ${BT}run_start${BT} event meta | ${BT}services/ingestion.py${BT} |
-| **B4** live socket connect race | Hub subscribes **before** reading state; events published in the gap are drained after ${BT}hello${BT} with ${BT}seq <= last_seq${BT} duplicates filtered. Socket errors now logged, not swallowed | ${BT}api/live.py${BT} |
+| **B1** stats 500 on null refs | `by_model`/`by_agent` exclude rows with NULL refs — legacy/bad rows can no longer 500 the endpoint | `services/queries.py` |
+| **B2** refs not validated | Strict `kind:id` grammar, allowed kinds, and per-type presence/kind rules from SCHEMA.md §4–5 → `422` with precise messages | `schemas/events.py` + `services/ingestion.py` |
+| **B3** framework/sdk_version never stored | Populated from create-time meta **and** backfilled from `run_start` event meta | `services/ingestion.py` |
+| **B4** live socket connect race | Hub subscribes **before** reading state; events published in the gap are drained after `hello` with `seq <= last_seq` duplicates filtered. Socket errors now logged, not swallowed | `api/live.py` |
 
 **Verified by re-running the original audit probes:**
 
 | Probe | Before | After |
 |---|---|---|
-| ${BT}GET /v1/stats${BT} after malformed event | 500 (ValidationError) | 200 |
-| ${BT}POST${BT} invalid refs (${BT}"not-a-ref"${BT}) | 200 accepted | 422 rejected |
-| ${BT}POST llm_call${BT} without ${BT}to${BT} | 200 accepted | 422 rejected |
-| ${BT}GET /v1/runs/{id}.framework${BT} | null | "langgraph" |
+| `GET /v1/stats` after malformed event | 500 (ValidationError) | 200 |
+| `POST` invalid refs (`"not-a-ref"`) | 200 accepted | 422 rejected |
+| `POST llm_call` without `to` | 200 accepted | 422 rejected |
+| `GET /v1/runs/{id}.framework` | null | "langgraph" |
 | Live event during connect window | could be lost | delivered (dedupe unit-tested) |
 
-No regressions: ${BT}store_full${BT} retention still preserves 20 000 chars; ${BT}schema_version${BT} rejection still 400.
+No regressions: `store_full` retention still preserves 20 000 chars; `schema_version` rejection still 400.
 
 ### Still open (unchanged)
 
 - **Priority 2** — performance: SQL-aggregated topology, constrained run summaries, 4 indexes (§5.3)
-- **Priority 3** — hygiene: ${BT}[tool.ruff]${BT} config, ${BT}.env${BT} location, timestamp normalization
+- **Priority 3** — hygiene: `[tool.ruff]` config, `.env` location, timestamp normalization
 - **Priority 4** — before publishing: auth, registry backfill, pagination totals
 - **Phase 2** — Python SDK (do not start until Priorities 1–3 are done)
 
@@ -557,12 +557,12 @@ Design decisions:
 **Step ⑪ — OpenAI Agents SDK adapter (
 `sdk/necto_sdk/adapters/openai_agents.py`).**
 
-- ${BT}NectoProcessor${BT} implements the SDK's ${BT}TracingProcessor${BT} interface (${BT}on_trace_start/end${BT},
-  ${BT}on_span_start/end${BT}, ${BT}shutdown${BT}, ${BT}force_flush${BT}). ${BT}instrument(necto)${BT} registers it.
-- Span mapping: ${BT}agent${BT} → ${BT}agent_start${BT}/${BT}agent_finish${BT}; ${BT}handoff${BT} → ${BT}handoff${BT}; ${BT}generation${BT} → ${BT}llm_call${BT}
-  (model, tokens from ${BT}usage${BT}, latency from span timestamps); ${BT}function${BT} → ${BT}tool_call${BT}/${BT}tool_result${BT}.
+- `NectoProcessor` implements the SDK's `TracingProcessor` interface (`on_trace_start/end`,
+  `on_span_start/end`, `shutdown`, `force_flush`). `instrument(necto)` registers it.
+- Span mapping: `agent` → `agent_start`/`agent_finish`; `handoff` → `handoff`; `generation` → `llm_call`
+  (model, tokens from `usage`, latency from span timestamps); `function` → `tool_call`/`tool_result`.
 - Provider is inferred from the model name (gpt/o1 → openai, claude → anthropic, gemini → google).
-- Duck-typed: importing the module never imports ${BT}agents${BT}. Only ${BT}instrument()${BT} needs the SDK and raises a
+- Duck-typed: importing the module never imports `agents`. Only `instrument()` needs the SDK and raises a
   clear ImportError otherwise (covered by a test).
 - Verified end-to-end over HTTP: a simulated trace produced 5 nodes / 5 edges — handoff
   triage→booking, gpt-4o-mini (240 tokens / 520 ms), claude-sonnet-4 (390 tokens / 450 ms) and a
@@ -1015,39 +1015,8 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 ---
 
-## 26. Update log — network unblocked: lint, packaging and real-framework validation
+---
 
-The previously blocked hosts (`files.pythonhosted.org`, `github.com`, Docker Hub) are reachable
-again. That unblocked four things that were explicitly deferred:
+## 27. Polish pass — Tier 2 (usability)
 
-**1. Ruff is now a real dev dependency.** Added `ruff>=0.9` to `server/pyproject.toml`, refreshed
-`uv.lock`, and added a root `ruff.toml` so `scripts/` and `examples/` share the same rules as the
-two packages (they were being formatted with ruff's defaults). Fixed 21 findings + reformatted
-~15 files. `ruff check` and `ruff format --check` are clean repo-wide.
-
-**2. Pre-commit actually runs.** The ruff hooks are pinned to v0.17.4 and `pre-commit run
---all-files` passes. The prettier hook was removed: `pre-commit/mirrors-prettier` is archived and
-its nodeenv bootstrap fails on this machine (frontend formatting is not enforced yet).
-
-**3. The SDK has a real dev setup and its wheel is verified.** `sdk/uv.lock` + its own venv; `uv
-build` produces a wheel that installs into a clean venv and records a run correctly. Tests jumped
-to **52**.
-
-**4. Real LangGraph integration test — and it found two shipping bugs:**
-
-- `NectoCallbackHandler` was missing LangChain's `ignore_*` / `raise_error` / `run_inline`
-  attributes. The first time a callback errored, LangChain's own error path raised
-  `AttributeError: 'NectoCallbackHandler' object has no attribute 'raise_error'` and **the user's
-  graph crashed**. Mock-based tests could never catch this.
-- `otel.instrument()` imported opentelemetry even when the caller passed a `tracer_provider`, so an
-  explicit provider failed with ImportError. Now only imports when it has to resolve the global
-  provider.
-
-`sdk/tests/test_langgraph_integration.py` runs a real `StateGraph` with a fake chat model and
-asserts agents, handoffs and llm_calls (skipped unless `uv sync --group frameworks`).
-
-**Also confirmed:** `docker pull hello-world` works straight from Docker Hub now (the
-`docker.m.daocloud.io` mirror is no longer required, kept as a fallback in the docs), and
-`git ls-remote https://github.com/...` succeeds — **the push blocker is gone**.
-
-**Totals:** server **74 passed**, SDK **52 passed, 1 skipped**, lint/format clean, pre-commit green.
+**Server**

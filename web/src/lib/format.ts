@@ -37,3 +37,11 @@ export function formatDuration(startIso: string, endIso: string | null): string 
 export function shortId(id: string): string {
   return id.slice(0, 8);
 }
+
+/** Full local date+time, for tooltips next to relative timestamps. */
+export function absoluteTime(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" });
+}

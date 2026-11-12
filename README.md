@@ -57,6 +57,9 @@ per-edge error rates:
 
 ![stats dashboard](docs/assets/stats-view.png)
 
+The runs list supports **search, framework filtering, sorting and pagination**; clicking a node dims
+everything not directly connected to it, and hovering an edge shows its metrics.
+
 A live run **builds the graph as it happens**, and the **replay scrubber** rebuilds it at any point:
 
 ![live run](docs/assets/live-view.png)
@@ -223,12 +226,13 @@ uv run python scripts/backfill_registries.py
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/v1/runs` | List runs with summaries (`?status=`, `limit`, `offset`) |
+| `GET` | `/v1/runs` | List runs (`?status=`, `?q=`, `?framework=`, `?sort=recent\|oldest\|cost\|events\|name`, `limit`, `offset`) |
 | `GET` | `/v1/runs/{id}` | Run detail |
 | `GET` | `/v1/runs/{id}/events` | Page through events (`?after_seq=`, `limit`) |
 | `GET` | `/v1/stats` | Cost / tokens / latency rollups (`?run_id=`) |
 | `GET` | `/v1/agents` | Agent registry |
 | `GET` | `/v1/models` | Model registry |
+| `GET` | `/v1/frameworks` | Distinct frameworks seen on runs |
 
 ### Live
 

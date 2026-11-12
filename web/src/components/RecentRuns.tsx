@@ -1,6 +1,8 @@
-import { formatMoney, formatRelative, shortId } from "../lib/format";
-import { useRuns } from "../lib/queries";
+import { useEffect, useState } from "react";
+import { formatMoney, shortId } from "../lib/format";
+import { useFrameworks, useRuns } from "../lib/queries";
 import { useUiStore } from "../store/ui";
+import { TimeAgo } from "./TimeAgo";
 
 const statusStyles: Record<string, string> = {
   running: "bg-sky-500/15 text-sky-300 ring-sky-500/30",
@@ -16,14 +18,85 @@ const FILTERS: { id: string | null; label: string }[] = [
   { id: "error", label: "Error" },
 ];
 
+const SORTS: { id: string; label: string }[] = [
+  { id: "recent", label: "Newest" },
+  { id: "oldest", label: "Oldest" },
+  { id: "cost", label: "Cost" },
+  { id: "events", label: "Events" },
+  { id: "name", label: "Name" },
+];
+
+const selectClass =
+  "rounded-md border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 focus:border-slate-600";
+
 export function RecentRuns() {
   const statusFilter = useUiStore((state) => state.statusFilter);
   const setStatusFilter = useUiStore((state) => state.setStatusFilter);
   const selectRun = useUiStore((state) => state.selectRun);
-  const { data, isLoading, isError, error } = useRuns(statusFilter ?? undefined);
+
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [framework, setFramework] = useState("");
+  const [sort, setSort] = useState("recent");
+
+  // Debounce typing so the server isn't hit on every keystroke.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  const frameworks = useFrameworks();
+  const runsQuery = useRuns({
+    status: statusFilter ?? undefined,
+    q: query || undefined,
+    framework: framework || undefined,
+    sort,
+  });
+
+  const runs = (runsQuery.data?.pages ?? []).flatMap((page) => page.runs);
+  const total = runsQuery.data?.pages[0]?.total ?? 0;
+  const hasFilters = Boolean(statusFilter || query || framework);
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search runs by name…"
+          aria-label="Search runs by name"
+          className="min-w-[12rem] flex-1 rounded-md border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:border-slate-600"
+        />
+
+        <select
+          value={framework}
+          onChange={(event) => setFramework(event.target.value)}
+          aria-label="Filter by framework"
+          className={selectClass}
+        >
+          <option value="">All frameworks</option>
+          {(frameworks.data ?? []).map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={sort}
+          onChange={(event) => setSort(event.target.value)}
+          aria-label="Sort runs"
+          className={selectClass}
+        >
+          {SORTS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         {FILTERS.map((filter) => {
           const active = statusFilter === filter.id;
@@ -44,30 +117,42 @@ export function RecentRuns() {
           );
         })}
         <span className="ml-auto text-[11px] text-slate-500">
-          {data ? `${data.runs.length} of ${data.total} runs` : ""}
+          {runsQuery.isPending ? "" : `${runs.length} of ${total} runs`}
         </span>
       </div>
 
-      {isLoading ? (
+      {runsQuery.isPending ? (
         <div className="text-sm text-slate-500">Loading runs…</div>
-      ) : isError ? (
+      ) : runsQuery.isError ? (
         <div className="rounded-lg border border-rose-900/60 bg-rose-950/30 px-4 py-3 text-sm text-rose-200">
-          {error instanceof Error ? error.message : "Failed to load runs"}
+          {runsQuery.error instanceof Error ? runsQuery.error.message : "Failed to load runs"}
         </div>
-      ) : !data || data.runs.length === 0 ? (
+      ) : runs.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-800 bg-slate-900/30 px-6 py-12 text-center">
-          <p className="text-sm font-medium text-slate-300">
-            {statusFilter ? `No ${statusFilter} runs` : "No runs yet"}
-          </p>
+          <p className="text-sm font-medium text-slate-300">No matching runs</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-            {statusFilter
-              ? "Try a different filter, or start a run and it will appear here."
+            {hasFilters
+              ? "Try clearing the search, framework or status filter."
               : "Point the necto SDK at this server, or POST events to /v1/runs, and they will appear here."}
           </p>
+          {hasFilters ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setQuery("");
+                setFramework("");
+                setStatusFilter(null);
+              }}
+              className="mt-3 rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-800">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-lg border border-slate-800">
+          <table className="w-full min-w-[40rem] text-left text-sm">
             <thead className="bg-slate-900/70 text-[11px] uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-4 py-2 font-medium">Run</th>
@@ -79,7 +164,7 @@ export function RecentRuns() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70">
-              {data.runs.map((run) => (
+              {runs.map((run) => (
                 <tr
                   key={run.id}
                   onClick={() => selectRun(run.id)}
@@ -107,13 +192,28 @@ export function RecentRuns() {
                   <td className="px-4 py-2.5 text-slate-400">{run.framework ?? "—"}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{run.event_count}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">{formatMoney(run.cost_usd)}</td>
-                  <td className="px-4 py-2.5 text-right text-slate-500">{formatRelative(run.started_at)}</td>
+                  <td className="px-4 py-2.5 text-right text-slate-500">
+                    <TimeAgo iso={run.started_at} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {runsQuery.hasNextPage ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => void runsQuery.fetchNextPage()}
+            disabled={runsQuery.isFetchingNextPage}
+            className="rounded-md border border-slate-700 px-4 py-1.5 text-xs text-slate-300 transition-colors hover:border-slate-600 hover:bg-slate-900 disabled:opacity-50"
+          >
+            {runsQuery.isFetchingNextPage ? "Loading…" : `Load more (${total - runs.length} left)`}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

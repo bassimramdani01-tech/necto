@@ -1,14 +1,19 @@
 import { useEffect, useMemo } from "react";
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  getSmoothStepPath,
   useReactFlow,
   type Edge,
+  type EdgeProps,
+  type EdgeTypes,
   type Node,
   type NodeProps,
   type NodeTypes,
@@ -41,16 +46,70 @@ const EDGE_STYLE: Record<string, { color: string; animated: boolean }> = {
 
 interface NodeData extends Record<string, unknown> {
   node: GraphNode;
+  dimmed?: boolean;
 }
+
+interface EdgeData extends Record<string, unknown> {
+  metrics: string;
+}
+
+/** Edge with a hoverable label whose tooltip carries the full metrics. */
+function NectoEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+  markerEnd,
+  label,
+  data,
+}: EdgeProps) {
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const metrics = (data as EdgeData | undefined)?.metrics;
+
+  return (
+    <>
+      <BaseEdge id={id} path={path} style={style} markerEnd={markerEnd} />
+      <EdgeLabelRenderer>
+        <div
+          className="nodrag nopan absolute rounded bg-slate-950/95 px-1.5 py-0.5 text-[10px] text-slate-300 ring-1 ring-slate-800 transition-colors hover:ring-sky-600"
+          title={metrics}
+          style={{
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "all",
+          }}
+        >
+          {typeof label === "string" ? label : null}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const edgeTypes: EdgeTypes = { necto: NectoEdge };
 
 // node labelling lives in lib/graph so the inspector can share it
 
 function NectoNode({ data }: NodeProps) {
-  const node = (data as NodeData).node;
+  const { node, dimmed } = data as NodeData;
   const style = KIND_STYLE[node.kind] ?? KIND_STYLE.external;
 
   return (
-    <div className={`min-w-[190px] rounded-lg border ${style.ring} bg-slate-900/95 px-3 py-2 shadow-xl`}>
+    <div
+      className={`min-w-[190px] rounded-lg border ${style.ring} bg-slate-900/95 px-3 py-2 shadow-xl transition-opacity ${
+        dimmed ? "opacity-30" : "opacity-100"
+      }`}
+    >
       <Handle id="target-left" type="target" position={Position.Left} className="!h-2 !w-2 !border-0 !bg-slate-600" />
       <Handle id="target-right" type="target" position={Position.Right} className="!h-2 !w-2 !border-0 !bg-slate-600" />
       <div className="flex items-center justify-between gap-2">
@@ -137,7 +196,12 @@ function orderAgents(agents: GraphNode[], edges: GraphEdge[]): GraphNode[] {
   return [...ordered, ...rest];
 }
 
-function layout(nodes: GraphNode[], edges: GraphEdge[], selectedId: string | null): Node[] {
+function layout(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  selectedId: string | null,
+  neighbours: ReadonlySet<string> | null,
+): Node[] {
   const agents = orderAgents(
     nodes.filter((node) => node.kind === "agent"),
     edges,
@@ -162,7 +226,7 @@ function layout(nodes: GraphNode[], edges: GraphEdge[], selectedId: string | nul
       id: node.id,
       type: "necto",
       position: { x: 40 + spot.column * 300, y: 40 + spot.row * 140 },
-      data: { node } as NodeData,
+      data: { node, dimmed: neighbours ? !neighbours.has(node.id) : false } as NodeData,
       selected: node.id === selectedId,
     });
   };
@@ -194,6 +258,7 @@ function buildEdges(
   columnOf: Map<string, number>,
   highlight: ReadonlySet<string>,
   selectedId: string | null,
+  neighbours: ReadonlySet<string> | null,
 ): Edge[] {
   return graph.edges.map((edge) => {
     const style = EDGE_STYLE[edge.kind] ?? { color: "#64748b", animated: false };
@@ -203,20 +268,36 @@ function buildEdges(
     const backward = (columnOf.get(edge.target) ?? 0) < (columnOf.get(edge.source) ?? 0);
     const isHot = highlight.has(edge.id);
     const color = hasError ? "#fb7185" : style.color;
+    const incident = edge.source === selectedId || edge.target === selectedId;
+    const dimmed = neighbours !== null && !incident;
+
+    const metrics = [
+      `${edge.kind} · ${edge.count} call${edge.count === 1 ? "" : "s"}`,
+      edge.tokens > 0 ? `${formatCompact(edge.tokens)} tokens` : "",
+      edge.cost_usd > 0 ? formatMoney(edge.cost_usd) : "",
+      edge.latency_ms > 0 ? `${edge.latency_ms} ms` : "",
+      edge.error_count > 0
+        ? `${edge.error_count} errors (${(edge.error_rate * 100).toFixed(0)}%)`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     return {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      type: "smoothstep",
+      type: "necto",
       sourceHandle: backward ? "source-left" : "source-right",
       targetHandle: backward ? "target-right" : "target-left",
       animated: style.animated || isHot,
       label,
-      labelStyle: { fill: "#cbd5e1", fontSize: 10 },
-      labelBgStyle: { fill: "#0f172a", fillOpacity: 0.95 },
-      labelBgPadding: [4, 2] as [number, number],
-      labelBgBorderRadius: 4,
-      style: { stroke: color, strokeWidth: hasError ? 2.4 : isHot ? 3 : 1.6 },
+      data: { metrics } as EdgeData,
+      style: {
+        stroke: color,
+        strokeWidth: hasError ? 2.4 : isHot ? 3 : 1.6,
+        opacity: dimmed ? 0.15 : 1,
+      },
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 16, height: 16 },
       selected: edge.id === selectedId,
     } as Edge;
@@ -273,17 +354,28 @@ function GraphCanvasInner({
     }, 80);
     return () => window.clearTimeout(timer);
   }, [fitView, graph.nodes.length, graph.edges.length]);
+  // When something is selected, dim everything that is not directly connected to it.
+  const neighbours = useMemo(() => {
+    if (!selectedId) return null;
+    const connected = new Set<string>([selectedId]);
+    for (const edge of graph.edges) {
+      if (edge.source === selectedId) connected.add(edge.target);
+      if (edge.target === selectedId) connected.add(edge.source);
+    }
+    return connected;
+  }, [selectedId, graph.edges]);
+
   const nodes = useMemo(
-    () => layout(graph.nodes, graph.edges, selectedId),
-    [graph.nodes, graph.edges, selectedId],
+    () => layout(graph.nodes, graph.edges, selectedId, neighbours),
+    [graph.nodes, graph.edges, selectedId, neighbours],
   );
   const edges = useMemo(() => {
     const columnOf = new Map<string, number>();
     for (const node of nodes) {
       columnOf.set(node.id, Math.round((node.position.x - 40) / 300));
     }
-    return buildEdges(graph, columnOf, highlightEdgeIds, selectedId);
-  }, [graph, nodes, highlightEdgeIds, selectedId]);
+    return buildEdges(graph, columnOf, highlightEdgeIds, selectedId, neighbours);
+  }, [graph, nodes, highlightEdgeIds, selectedId, neighbours]);
 
   return (
     <div
@@ -295,6 +387,7 @@ function GraphCanvasInner({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         fitViewOptions={{ padding: 0.18 }}
         minZoom={0.2}

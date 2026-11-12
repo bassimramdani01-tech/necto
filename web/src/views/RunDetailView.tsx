@@ -111,6 +111,15 @@ export function RunDetailView({ runId }: { runId: string }) {
     setReplayInitialised(true);
   }, [replayInitialised, total]);
 
+  // Reflect the open run in the browser tab (nice for screenshots/bookmarks).
+  useEffect(() => {
+    const base = "necto — AI architecture, visualized";
+    document.title = run.data?.name ? `${run.data.name} · necto` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [run.data?.name]);
+
   // Escape closes the inspector.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -280,6 +289,10 @@ export function RunDetailView({ runId }: { runId: string }) {
               graph={graph}
               events={inspectorEvents}
               onClose={() => selectEntity(null)}
+              onJumpToEvent={(seq) => {
+                setMode("replay");
+                setCursor(seq);
+              }}
             />
           ) : null}
         </div>

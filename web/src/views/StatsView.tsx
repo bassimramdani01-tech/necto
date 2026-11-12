@@ -149,7 +149,7 @@ export function StatsView() {
             className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200"
           >
             <option value="">All runs</option>
-            {(runs.data?.runs ?? []).map((run) => (
+            {(runs.data?.pages[0]?.runs ?? []).map((run) => (
               <option key={run.id} value={run.id}>
                 {run.name ?? "untitled"} · {run.id.slice(0, 8)}
               </option>

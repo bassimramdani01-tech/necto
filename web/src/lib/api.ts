@@ -44,6 +44,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export interface RunListOptions {
+  status?: string;
+  q?: string;
+  framework?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface RunListResult {
   runs: RunSummary[];
   total: number;
@@ -52,9 +61,12 @@ export interface RunListResult {
 export const api = {
   health: () => request<Health>("/healthz"),
 
-  async listRuns(options: { status?: string; limit?: number; offset?: number } = {}): Promise<RunListResult> {
+  async listRuns(options: RunListOptions = {}): Promise<RunListResult> {
     const params = new URLSearchParams();
     if (options.status) params.set("status", options.status);
+    if (options.q) params.set("q", options.q);
+    if (options.framework) params.set("framework", options.framework);
+    if (options.sort) params.set("sort", options.sort);
     if (options.limit != null) params.set("limit", String(options.limit));
     if (options.offset != null) params.set("offset", String(options.offset));
     const query = params.toString();
@@ -68,6 +80,8 @@ export const api = {
     const runs = (await response.json()) as RunSummary[];
     return { runs, total: Number(response.headers.get("X-Total-Count") ?? runs.length) };
   },
+
+  listFrameworks: () => request<string[]>("/v1/frameworks"),
 
   getRun: (runId: string) => request<RunDetail>(`/v1/runs/${runId}`),
 

@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { formatMoney, formatNumber, formatRelative } from "../lib/format";
+import { useMemo, useState } from "react";
+import { absoluteTime, formatMoney, formatNumber, formatRelative } from "../lib/format";
 import { labelFor, nodeLabel } from "../lib/graph";
 import type { EventOut, GraphEdge, GraphNode, GraphResponse } from "../lib/types";
 
@@ -13,20 +13,33 @@ interface InspectorProps {
   graph: GraphResponse;
   events: EventOut[];
   onClose: () => void;
+  onJumpToEvent?: (seq: number) => void;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-slate-800/60 py-1.5 text-xs last:border-0">
       <span className="shrink-0 text-slate-500">{label}</span>
-      <span className="truncate font-medium text-slate-200" title={value}>
+      <span className="truncate font-medium text-slate-200" title={title ?? value}>
         {value}
       </span>
     </div>
   );
 }
 
-function EventRow({ event }: { event: EventOut }) {
+function EventRow({ event, onJump }: { event: EventOut; onJump?: (seq: number) => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyPayload = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(event.payload, null, 2));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard unavailable (e.g. insecure context) — the payload is still visible below
+    }
+  };
+
   return (
     <details className="group rounded border border-slate-800/70 bg-slate-900/40 px-2 py-1.5 text-xs">
       <summary className="cursor-pointer list-none">
@@ -35,14 +48,38 @@ function EventRow({ event }: { event: EventOut }) {
           <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
             {event.type}
           </span>
-          <span className="ml-auto text-[10px] text-slate-500">
+          <time
+            dateTime={event.ts}
+            title={absoluteTime(event.ts)}
+            className="ml-auto text-[10px] text-slate-500"
+          >
             {new Date(event.ts).toLocaleTimeString([], { hour12: false })}
-          </span>
+          </time>
         </div>
         <div className="mt-1 truncate text-[11px] text-slate-400">
           {event.from_ref ?? "—"} → {event.to_ref ?? "—"}
         </div>
       </summary>
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void copyPayload()}
+          className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 transition-colors hover:bg-slate-800"
+        >
+          {copied ? "Copied" : "Copy JSON"}
+        </button>
+        {onJump ? (
+          <button
+            type="button"
+            onClick={() => onJump(event.seq)}
+            className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 transition-colors hover:bg-slate-800"
+          >
+            Replay to here
+          </button>
+        ) : null}
+      </div>
+
       <pre className="mt-2 max-h-56 overflow-auto rounded bg-slate-950/80 p-2 text-[10px] leading-relaxed text-slate-400">
         {JSON.stringify(event.payload, null, 2)}
       </pre>
@@ -62,8 +99,8 @@ function NodeDetails({ node }: { node: GraphNode }) {
       <Row label="tokens" value={formatNumber(node.tokens)} />
       <Row label="cost" value={formatMoney(node.cost_usd)} />
       <Row label="errors" value={formatNumber(node.error_count)} />
-      <Row label="first seen" value={formatRelative(node.first_ts)} />
-      <Row label="last seen" value={formatRelative(node.last_ts)} />
+      <Row label="first seen" value={formatRelative(node.first_ts)} title={absoluteTime(node.first_ts)} />
+      <Row label="last seen" value={formatRelative(node.last_ts)} title={absoluteTime(node.last_ts)} />
     </>
   );
 }
@@ -85,13 +122,13 @@ function EdgeDetails({ edge, graph }: { edge: GraphEdge; graph: GraphResponse })
         label="errors"
         value={`${formatNumber(edge.error_count)} (${(edge.error_rate * 100).toFixed(0)}%)`}
       />
-      <Row label="first seen" value={formatRelative(edge.first_ts)} />
-      <Row label="last seen" value={formatRelative(edge.last_ts)} />
+      <Row label="first seen" value={formatRelative(edge.first_ts)} title={absoluteTime(edge.first_ts)} />
+      <Row label="last seen" value={formatRelative(edge.last_ts)} title={absoluteTime(edge.last_ts)} />
     </>
   );
 }
 
-export function Inspector({ selection, graph, events, onClose }: InspectorProps) {
+export function Inspector({ selection, graph, events, onClose, onJumpToEvent }: InspectorProps) {
   const node = selection.kind === "node" ? graph.nodes.find((item) => item.id === selection.id) : undefined;
   const edge = selection.kind === "edge" ? graph.edges.find((item) => item.id === selection.id) : undefined;
 
@@ -143,7 +180,9 @@ export function Inspector({ selection, graph, events, onClose }: InspectorProps)
           </p>
         ) : (
           <>
-            <div className="mb-4">{node ? <NodeDetails node={node} /> : edge ? <EdgeDetails edge={edge} graph={graph} /> : null}</div>
+            <div className="mb-4">
+              {node ? <NodeDetails node={node} /> : edge ? <EdgeDetails edge={edge} graph={graph} /> : null}
+            </div>
 
             <div className="mb-2 flex items-baseline justify-between">
               <h3 className="text-[11px] uppercase tracking-wider text-slate-500">Events</h3>
@@ -155,12 +194,10 @@ export function Inspector({ selection, graph, events, onClose }: InspectorProps)
             ) : (
               <div className="space-y-1.5">
                 {matching.slice(0, 50).map((event) => (
-                  <EventRow key={event.seq} event={event} />
+                  <EventRow key={event.seq} event={event} onJump={onJumpToEvent} />
                 ))}
                 {matching.length > 50 ? (
-                  <p className="pt-1 text-[11px] text-slate-500">
-                    showing 50 of {matching.length}
-                  </p>
+                  <p className="pt-1 text-[11px] text-slate-500">showing 50 of {matching.length}</p>
                 ) : null}
               </div>
             )}
