@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -46,7 +46,7 @@ POLICIES = {
 
 
 def _ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _event(
@@ -100,13 +100,20 @@ def build_demo_events(
         # The failure: the message carried the order id, the handoff does not.
         _event(
             "handoff",
-            {"reason": "needs refund policy", "context_snippet": "Ticket summary: damaged order refund request"},
+            {
+                "reason": "needs refund policy",
+                "context_snippet": "Ticket summary: damaged order refund request",
+            },
             "agent:router",
             "agent:researcher",
         ),
         _event("agent_finish", {"duration_ms": rng.randint(700, 1400)}, from_ref="agent:router"),
         # -- researcher ----------------------------------------------------
-        _event("agent_start", {"name": "Researcher", "framework": "necto-demo"}, to_ref="agent:researcher"),
+        _event(
+            "agent_start",
+            {"name": "Researcher", "framework": "necto-demo"},
+            to_ref="agent:researcher",
+        ),
         _event(
             "tool_call",
             {"name": "web_search", "input_snippet": f"refund policy {order_id}"},
@@ -151,7 +158,9 @@ def build_demo_events(
             "agent:researcher",
             "agent:writer",
         ),
-        _event("agent_finish", {"duration_ms": rng.randint(1800, 3200)}, from_ref="agent:researcher"),
+        _event(
+            "agent_finish", {"duration_ms": rng.randint(1800, 3200)}, from_ref="agent:researcher"
+        ),
         # -- writer --------------------------------------------------------
         _event("agent_start", {"name": "Writer", "framework": "necto-demo"}, to_ref="agent:writer"),
         _event(
@@ -210,7 +219,9 @@ def build_demo_events(
 
     events.extend(
         [
-            _event("agent_finish", {"duration_ms": rng.randint(800, 1600)}, from_ref="agent:critic"),
+            _event(
+                "agent_finish", {"duration_ms": rng.randint(800, 1600)}, from_ref="agent:critic"
+            ),
             _event(
                 "run_finish",
                 {

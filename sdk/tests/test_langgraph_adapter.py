@@ -1,5 +1,3 @@
-import pytest
-
 from necto_sdk import Necto, RecordingTransport
 from necto_sdk.adapters.langgraph import NectoCallbackHandler, attach
 
@@ -28,7 +26,10 @@ def setup():
 
 def node_start(handler, run_id, parent_id, node):
     handler.on_chain_start(
-        {"name": node}, {}, run_id=run_id, parent_run_id=parent_id,
+        {"name": node},
+        {},
+        run_id=run_id,
+        parent_run_id=parent_id,
         metadata={"langgraph_node": node},
     )
 
@@ -78,8 +79,10 @@ def test_llm_end_records_tokens_latency_and_model():
     handler.on_chain_start({"name": "graph"}, {}, run_id="root")
     node_start(handler, "n1", "root", "router")
     handler.on_chat_model_start(
-        {"name": "ChatOpenAI", "model_name": "gpt-4o-mini"}, [[]],
-        run_id="l1", parent_run_id="n1",
+        {"name": "ChatOpenAI", "model_name": "gpt-4o-mini"},
+        [[]],
+        run_id="l1",
+        parent_run_id="n1",
     )
     handler.on_llm_end(FakeResponse(10, 5), run_id="l1", parent_run_id="n1")
     handler.on_chain_end({}, run_id="root")

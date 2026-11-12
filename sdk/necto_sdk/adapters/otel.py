@@ -184,9 +184,7 @@ class NectoSpanProcessor:
                 self._agents.pop()
         elif op in _LLM_OPS:
             model = str(
-                attrs.get("gen_ai.response.model")
-                or attrs.get("gen_ai.request.model")
-                or "unknown"
+                attrs.get("gen_ai.response.model") or attrs.get("gen_ai.request.model") or "unknown"
             )
             run.llm_call(
                 self._current_agent(),
@@ -234,18 +232,17 @@ def instrument(
 ) -> NectoSpanProcessor:
     """Register a necto span processor with OpenTelemetry.
 
-    Raises ImportError when the OpenTelemetry SDK is not installed.
+    Raises ImportError when the OpenTelemetry SDK is not installed *and* no
+    `tracer_provider` was passed — an explicit provider needs no import.
     """
-    try:
-        from opentelemetry import trace  # noqa: PLC0415 - optional dependency
-    except ImportError as exc:  # pragma: no cover - depends on environment
-        raise ImportError(
-            "The OpenTelemetry SDK is required for this adapter: "
-            "pip install opentelemetry-sdk"
-        ) from exc
-
     provider = tracer_provider
     if provider is None:
+        try:
+            from opentelemetry import trace  # noqa: PLC0415 - optional dependency
+        except ImportError as exc:  # pragma: no cover - depends on environment
+            raise ImportError(
+                "The OpenTelemetry SDK is required for this adapter: pip install opentelemetry-sdk"
+            ) from exc
         provider = trace.get_tracer_provider()
     if not hasattr(provider, "add_span_processor"):
         raise RuntimeError(

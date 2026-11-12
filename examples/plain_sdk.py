@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdk"))
 
-from necto_sdk import Necto  # noqa: E402
+from necto_sdk import Necto
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,8 +34,13 @@ def main() -> int:
     with necto.run(name="example-pipeline", meta={"language": "python"}) as run:
         run.agent_start("planner", name="Planner")
         run.llm_call(
-            "planner", "openai", "gpt-4o-mini",
-            input_tokens=120, output_tokens=40, cost_usd=0.0004, latency_ms=310,
+            "planner",
+            "openai",
+            "gpt-4o-mini",
+            input_tokens=120,
+            output_tokens=40,
+            cost_usd=0.0004,
+            latency_ms=310,
             prompt_snippet="Plan the answer",
         )
         run.handoff("planner", "writer", reason="draft ready")

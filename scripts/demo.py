@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdk"))
 
-from necto_sdk import Necto  # noqa: E402
+from necto_sdk import Necto
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:8000"
 
@@ -100,7 +100,9 @@ def generate_run(
         run.agent_start("router", name="Router", framework="necto-demo", input_snippet=ticket)
         emit.pause()
         run.llm_call(
-            "router", "openai", "gpt-4o-mini",
+            "router",
+            "openai",
+            "gpt-4o-mini",
             input_tokens=rng.randint(180, 320),
             output_tokens=rng.randint(20, 60),
             latency_ms=rng.randint(240, 520),
@@ -110,7 +112,8 @@ def generate_run(
         emit.pause()
 
         run.message(
-            "router", "researcher",
+            "router",
+            "researcher",
             content_snippet=f"Ticket {order_id}: {ticket}",
             intent="delegate",
         )
@@ -118,7 +121,8 @@ def generate_run(
 
         # The failure: the delegate message carries the order id, the handoff does not.
         run.handoff(
-            "router", "researcher",
+            "router",
+            "researcher",
             reason="needs refund policy",
             context_snippet="Ticket summary: damaged order refund request",
         )
@@ -128,21 +132,34 @@ def generate_run(
         # -- researcher: look up policy ----------------------------------
         run.agent_start("researcher", name="Researcher", framework="necto-demo")
         emit.pause()
-        run.tool_call("researcher", "web_search", name="web_search", input_snippet=f"refund policy {order_id}")
+        run.tool_call(
+            "researcher",
+            "web_search",
+            name="web_search",
+            input_snippet=f"refund policy {order_id}",
+        )
         emit.pause()
         run.tool_result(
-            "web_search", "researcher",
+            "web_search",
+            "researcher",
             ok=True,
             latency_ms=rng.randint(320, 900),
             output_snippet=policy[:80],
         )
         emit.pause()
-        run.tool_call("researcher", "policy_db", name="policy_db", input_snippet="lookup refund rules")
+        run.tool_call(
+            "researcher",
+            "policy_db",
+            name="policy_db",
+            input_snippet="lookup refund rules",
+        )
         emit.pause()
         run.tool_result("policy_db", "researcher", ok=True, latency_ms=rng.randint(40, 120))
         emit.pause()
         run.llm_call(
-            "researcher", "anthropic", "claude-sonnet-4",
+            "researcher",
+            "anthropic",
+            "claude-sonnet-4",
             input_tokens=rng.randint(500, 900),
             output_tokens=rng.randint(90, 180),
             latency_ms=rng.randint(700, 1500),
@@ -160,7 +177,9 @@ def generate_run(
         run.state_write("writer", "draft", value_snippet="Dear customer, regarding your order...")
         emit.pause()
         run.llm_call(
-            "writer", "anthropic", "claude-sonnet-4",
+            "writer",
+            "anthropic",
+            "claude-sonnet-4",
             input_tokens=rng.randint(600, 1100),
             output_tokens=rng.randint(140, 260),
             latency_ms=rng.randint(900, 1800),
@@ -176,7 +195,9 @@ def generate_run(
         run.agent_start("critic", name="Critic", framework="necto-demo")
         emit.pause()
         run.llm_call(
-            "critic", "openai", "gpt-4o-mini",
+            "critic",
+            "openai",
+            "gpt-4o-mini",
             input_tokens=rng.randint(300, 600),
             output_tokens=rng.randint(40, 120),
             latency_ms=rng.randint(300, 700),
@@ -194,7 +215,10 @@ def generate_run(
             emit.pause()
 
         run.agent_finish("critic", duration_ms=rng.randint(800, 1600))
-        run.run_finish(status="error" if broken else "ok", output="draft ready for review" if not broken else "draft sent back")
+        run.run_finish(
+            status="error" if broken else "ok",
+            output="draft ready for review" if not broken else "draft sent back",
+        )
         emit.pause()
 
         status = "error" if broken else "ok"

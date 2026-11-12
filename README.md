@@ -6,7 +6,7 @@
 tools, and it renders the whole thing as one interactive network graph — so you can see how your AI
 actually works, instead of piecing it together from logs.
 
-![tests](https://img.shields.io/badge/tests-125%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-126%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![node](https://img.shields.io/badge/node-20%2B-yellow)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -141,7 +141,7 @@ normative [docs/SCHEMA.md](docs/SCHEMA.md).
 | Piece | State |
 |---|---|
 | Backend — ingestion, graph, query, live WebSocket | ✅ done · **74 tests** |
-| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **51 tests** |
+| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **52 tests** (incl. a real LangGraph run) |
 | Web UI — runs, graph, live, replay, inspector, stats | ✅ done |
 | Self-host via `docker compose` | ✅ verified (PostgreSQL 16 in Docker) |
 | CI, PyPI release, GitHub release | ⬜ Phase 5 |
@@ -182,9 +182,11 @@ pnpm dev            # http://localhost:5173  (proxies /v1 + WebSocket to :8000)
 ### Tests
 
 ```bash
-cd server && uv run pytest -q      # 74 server tests
+cd server && uv run pytest -q          # 74 server tests
+cd ../sdk && uv run pytest -q          # 52 SDK tests (uv manages the SDK venv)
 
-cd .. && PYTHONPATH=sdk python -m pytest sdk/tests -q   # 51 SDK tests
+# lint (repo-wide, from server/)
+cd ../server && uv run ruff check .. && uv run ruff format --check ..
 ``` 
 
 ### Regenerate the demo GIF

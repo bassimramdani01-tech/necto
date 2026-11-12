@@ -135,6 +135,20 @@ def _token_counts(response: Any) -> tuple[int | None, int | None]:
 class NectoCallbackHandler:
     """LangChain/LangGraph callback handler that emits necto events."""
 
+    # LangChain's CallbackManager reads these attributes on every handler; without them a
+    # single callback error turns into AttributeError inside the framework's error path.
+    ignore_llm = False
+    ignore_chain = False
+    ignore_agent = False
+    ignore_retriever = False
+    ignore_chat_model = False
+    raise_error = False
+    run_inline = False
+
+    @property
+    def always_verbose(self) -> bool:
+        return True
+
     def __init__(
         self,
         necto: Necto,
@@ -235,7 +249,9 @@ class NectoCallbackHandler:
         **kwargs: Any,
     ) -> None:
         if self._run is not None:
-            node = self._node_for(run_id) if self._chains.get(run_id) is None else self._chains[run_id]
+            node = (
+                self._node_for(run_id) if self._chains.get(run_id) is None else self._chains[run_id]
+            )
             self._run.error(node or "unknown", str(error or "chain error"))
 
     # -- models ------------------------------------------------------------
@@ -262,7 +278,9 @@ class NectoCallbackHandler:
         parent_run_id: Any = None,
         **kwargs: Any,
     ) -> None:
-        self.on_llm_start(serialized, messages, run_id=run_id, parent_run_id=parent_run_id, **kwargs)
+        self.on_llm_start(
+            serialized, messages, run_id=run_id, parent_run_id=parent_run_id, **kwargs
+        )
 
     @_guard
     def on_llm_end(
@@ -277,7 +295,9 @@ class NectoCallbackHandler:
             return
         started = self._llm_start.pop(run_id, None)
         latency_ms = int((time.monotonic() - started[0]) * 1000) if started else None
-        provider, model = (started[1].split(":", 1) + ["unknown"])[:2] if started else ("unknown", "unknown")
+        provider, model = (
+            (started[1].split(":", 1) + ["unknown"])[:2] if started else ("unknown", "unknown")
+        )
         input_tokens, output_tokens = _token_counts(response)
         node = self._node_for(parent_run_id) or self._last_node or "unknown"
         self._run.llm_call(
@@ -333,7 +353,9 @@ class NectoCallbackHandler:
         name = started[0] if started else "tool"
         latency_ms = int((time.monotonic() - started[1]) * 1000) if started else None
         node = self._node_for(parent_run_id) or self._last_node or "unknown"
-        self._run.tool_result(name, node, ok=True, latency_ms=latency_ms, output_snippet=str(output))
+        self._run.tool_result(
+            name, node, ok=True, latency_ms=latency_ms, output_snippet=str(output)
+        )
 
     @_guard
     def on_tool_error(

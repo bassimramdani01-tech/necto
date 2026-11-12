@@ -1012,7 +1012,42 @@ Added `examples/` so a first-time user can get real data in without reverse-engi
 syntax-checked only — no API keys or provider packages are available on this machine.
 
 Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now exposed, so an
-instrumented app can print a direct UI link to its run. Covered by assertions in the adapter tests.
 
-**Manual-run instructions verified:** `uv sync --frozen` works offline (it only reinstalls the
-local package), so a machine with a populated `.venv` can start without PyPI access.
+---
+
+## 26. Update log — network unblocked: lint, packaging and real-framework validation
+
+The previously blocked hosts (`files.pythonhosted.org`, `github.com`, Docker Hub) are reachable
+again. That unblocked four things that were explicitly deferred:
+
+**1. Ruff is now a real dev dependency.** Added `ruff>=0.9` to `server/pyproject.toml`, refreshed
+`uv.lock`, and added a root `ruff.toml` so `scripts/` and `examples/` share the same rules as the
+two packages (they were being formatted with ruff's defaults). Fixed 21 findings + reformatted
+~15 files. `ruff check` and `ruff format --check` are clean repo-wide.
+
+**2. Pre-commit actually runs.** The ruff hooks are pinned to v0.17.4 and `pre-commit run
+--all-files` passes. The prettier hook was removed: `pre-commit/mirrors-prettier` is archived and
+its nodeenv bootstrap fails on this machine (frontend formatting is not enforced yet).
+
+**3. The SDK has a real dev setup and its wheel is verified.** `sdk/uv.lock` + its own venv; `uv
+build` produces a wheel that installs into a clean venv and records a run correctly. Tests jumped
+to **52**.
+
+**4. Real LangGraph integration test — and it found two shipping bugs:**
+
+- `NectoCallbackHandler` was missing LangChain's `ignore_*` / `raise_error` / `run_inline`
+  attributes. The first time a callback errored, LangChain's own error path raised
+  `AttributeError: 'NectoCallbackHandler' object has no attribute 'raise_error'` and **the user's
+  graph crashed**. Mock-based tests could never catch this.
+- `otel.instrument()` imported opentelemetry even when the caller passed a `tracer_provider`, so an
+  explicit provider failed with ImportError. Now only imports when it has to resolve the global
+  provider.
+
+`sdk/tests/test_langgraph_integration.py` runs a real `StateGraph` with a fake chat model and
+asserts agents, handoffs and llm_calls (skipped unless `uv sync --group frameworks`).
+
+**Also confirmed:** `docker pull hello-world` works straight from Docker Hub now (the
+`docker.m.daocloud.io` mirror is no longer required, kept as a fallback in the docs), and
+`git ls-remote https://github.com/...` succeeds — **the push blocker is gone**.
+
+**Totals:** server **74 passed**, SDK **52 passed, 1 skipped**, lint/format clean, pre-commit green.

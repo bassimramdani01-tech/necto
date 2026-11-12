@@ -150,7 +150,30 @@ Database:
 | Port 5432 already in use | Stop the other PostgreSQL, or change the port in both places |
 | Docker engine won't start | Confirm virtualization is enabled (B1) and WSL2 is installed (B2) |
 
+## SDK development
+
+```bash
+cd sdk
+uv sync                      # own venv, own uv.lock
+uv run pytest -q             # 52 tests
+uv sync --group frameworks   # optional: adds langgraph for the real-framework tests
+uv build                     # wheel + sdist in sdk/dist/
+```
+
+## Lint and pre-commit
+
+```bash
+cd server
+uv run ruff check ..              # repo-wide (root ruff.toml + per-project configs)
+uv run ruff format --check ..
+
+pre-commit run --all-files        # from the repo root
+```
+
 ## Network-restricted environments
+
+> As of the last check, `files.pythonhosted.org`, `github.com` and Docker Hub are reachable again,
+> so most of the notes below are only relevant on a restricted network.
 
 If Docker Hub is blocked or DNS-poisoned (common on some networks, e.g. `registry-1.docker.io`
 resolving to an unrelated IP), image pulls fail with *"connect: No connection could be made"*.

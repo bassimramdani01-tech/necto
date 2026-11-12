@@ -21,10 +21,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdk"))
 
-from agents import Agent, Runner, handoff  # noqa: E402
+from agents import Agent, Runner, handoff
 
-from necto_sdk import Necto  # noqa: E402
-from necto_sdk.adapters.openai_agents import instrument  # noqa: E402
+from necto_sdk import Necto
+from necto_sdk.adapters.openai_agents import instrument
 
 
 def parse_args() -> argparse.Namespace:

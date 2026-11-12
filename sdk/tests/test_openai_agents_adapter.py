@@ -62,9 +62,7 @@ def test_agent_spans_become_agents():
 def test_handoff_span_emits_handoff():
     transport, p = setup()
     p.on_trace_start(Trace())
-    p.on_span_end(
-        Span("h1", Data("handoff", from_agent="triage", to_agent="refunds"))
-    )
+    p.on_span_end(Span("h1", Data("handoff", from_agent="triage", to_agent="refunds")))
     p.on_trace_end(Trace())
 
     handoffs = [e for e in transport.all_events() if e["type"] == "handoff"]

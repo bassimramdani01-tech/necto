@@ -1,5 +1,3 @@
-import pytest
-
 from necto_sdk import Necto, RecordingTransport
 
 
@@ -39,7 +37,9 @@ def test_meta_includes_sdk_version_and_framework():
 def test_llm_call_builds_model_ref():
     necto, transport = make_tracer()
     with necto.run() as run:
-        run.llm_call("router", "openai", "gpt-4o-mini", input_tokens=10, output_tokens=5, cost_usd=0.001)
+        run.llm_call(
+            "router", "openai", "gpt-4o-mini", input_tokens=10, output_tokens=5, cost_usd=0.001
+        )
     necto.flush()
 
     event = transport.all_events()[0]
@@ -124,6 +124,7 @@ def test_background_flush_delivers_events():
         necto.close()
     assert len(transport.all_events()) >= 1
 
+
 def test_error_accepts_bare_id_or_full_ref():
     necto, transport = make_tracer()
     with necto.run() as run:
@@ -134,6 +135,7 @@ def test_error_accepts_bare_id_or_full_ref():
     first, second = transport.all_events()
     assert first["from"] == "agent:writer"
     assert second["from"] == "tool:web_search"
+
 
 def test_state_write_uses_state_ref():
     necto, transport = make_tracer()

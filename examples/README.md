@@ -23,13 +23,19 @@ Every agent is just a ref: `agent:<id>`. Models are provider-namespaced: `model:
 
 ```python
 with necto.run(name="my-pipeline") as run:
-    run.agent_start("planner", name="Planner")                       # node: agent:planner
-    run.llm_call("planner", "openai", "gpt-4o-mini",                 # edge: agent:planner → model:openai:gpt-4o-mini
-                 input_tokens=812, output_tokens=95,
-                 cost_usd=0.0021, latency_ms=640)
-    run.tool_call("planner", "web_search")                           # node: tool:web_search
+    run.agent_start("planner", name="Planner")  # node: agent:planner
+    run.llm_call(
+        "planner",
+        "openai",
+        "gpt-4o-mini",  # edge: agent:planner → model:openai:gpt-4o-mini
+        input_tokens=812,
+        output_tokens=95,
+        cost_usd=0.0021,
+        latency_ms=640,
+    )
+    run.tool_call("planner", "web_search")  # node: tool:web_search
     run.tool_result("web_search", "planner", ok=True, latency_ms=430)
-    run.handoff("planner", "writer", reason="draft ready")           # the highlighted edge
+    run.handoff("planner", "writer", reason="draft ready")  # the highlighted edge
 ```
 
 The adapters do this for you when a framework is available; the plain tracer is the escape hatch

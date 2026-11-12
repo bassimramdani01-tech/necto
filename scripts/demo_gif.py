@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import argparse
 import base64
-import glob
+import contextlib
 import json
 import os
 import socket
@@ -112,10 +112,8 @@ class WebSocket:
             return data.decode()
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(OSError):
             self.sock.close()
-        except OSError:
-            pass
 
 
 class CDP:

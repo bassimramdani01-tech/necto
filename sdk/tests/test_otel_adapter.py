@@ -46,8 +46,10 @@ def collected(transport, processor):
 
 def test_agent_span_becomes_agent_events():
     transport, p = setup()
-    span = Span("invoke_agent triage", {"gen_ai.operation.name": "invoke_agent",
-                                        "gen_ai.agent.name": "triage"})
+    span = Span(
+        "invoke_agent triage",
+        {"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "triage"},
+    )
     p.on_start(span)
     p.on_end(span)
 
@@ -82,8 +84,10 @@ def test_chat_span_becomes_llm_call_with_tokens_and_latency():
 
 def test_tool_span_becomes_call_and_result():
     transport, p = setup()
-    span = Span("execute_tool web_search",
-                {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "web_search"})
+    span = Span(
+        "execute_tool web_search",
+        {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": "web_search"},
+    )
     p.on_start(span)
     p.on_end(span)
 
@@ -96,10 +100,18 @@ def test_tool_span_becomes_call_and_result():
 
 def test_agent_transition_emits_handoff():
     transport, p = setup()
-    p.on_start(Span("invoke_agent triage", {"gen_ai.operation.name": "invoke_agent",
-                                            "gen_ai.agent.name": "triage"}, span_id=1))
-    second = Span("invoke_agent booking", {"gen_ai.operation.name": "invoke_agent",
-                                           "gen_ai.agent.name": "booking"}, span_id=2)
+    p.on_start(
+        Span(
+            "invoke_agent triage",
+            {"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "triage"},
+            span_id=1,
+        )
+    )
+    second = Span(
+        "invoke_agent booking",
+        {"gen_ai.operation.name": "invoke_agent", "gen_ai.agent.name": "booking"},
+        span_id=2,
+    )
     p.on_start(second)
     p.on_end(second)
 
@@ -149,8 +161,9 @@ def test_processor_swallows_exceptions():
 
 def test_anthropic_provider_inferred_from_model():
     transport, p = setup()
-    p.on_end(Span("chat", {"gen_ai.operation.name": "chat",
-                           "gen_ai.request.model": "claude-sonnet-4"}))
+    p.on_end(
+        Span("chat", {"gen_ai.operation.name": "chat", "gen_ai.request.model": "claude-sonnet-4"})
+    )
     call = collected(transport, p)[0]
     assert call["to"] == "model:anthropic:claude-sonnet-4"
 

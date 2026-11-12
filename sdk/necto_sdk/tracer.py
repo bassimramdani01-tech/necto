@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from ._version import __version__
 from .events import agent as agent_ref
+from .events import event as make_event
 from .events import model as model_ref
 from .events import state as state_ref
 from .events import tool as tool_ref
-from .events import event as make_event
 from .transport import HttpTransport, NullTransport, Transport
 
 logger = logging.getLogger(__name__)
@@ -162,9 +163,7 @@ class Run:
             payload["reason"] = reason
         if context_snippet is not None:
             payload["context_snippet"] = context_snippet
-        self.emit(
-            "handoff", payload, from_ref=agent_ref(from_agent), to_ref=agent_ref(to_agent)
-        )
+        self.emit("handoff", payload, from_ref=agent_ref(from_agent), to_ref=agent_ref(to_agent))
 
     def message(
         self,
@@ -176,9 +175,7 @@ class Run:
         payload: dict[str, Any] = {"content_snippet": content_snippet}
         if intent is not None:
             payload["intent"] = intent
-        self.emit(
-            "message", payload, from_ref=agent_ref(from_agent), to_ref=agent_ref(to_agent)
-        )
+        self.emit("message", payload, from_ref=agent_ref(from_agent), to_ref=agent_ref(to_agent))
 
     # -- state / errors ----------------------------------------------------
     def state_write(
@@ -191,9 +188,7 @@ class Run:
         payload: dict[str, Any] = {"key": key}
         if value_snippet is not None:
             payload["value_snippet"] = value_snippet
-        self.emit(
-            "state_write", payload, from_ref=agent_ref(agent_id), to_ref=state_ref(state_id)
-        )
+        self.emit("state_write", payload, from_ref=agent_ref(agent_id), to_ref=state_ref(state_id))
 
     def error(
         self,
@@ -246,9 +241,7 @@ class Necto:
         self._thread: threading.Thread | None = None
         # No point running a flusher when nothing can be delivered.
         if enabled and background and not isinstance(self._transport, NullTransport):
-            self._thread = threading.Thread(
-                target=self._loop, name="necto-flush", daemon=True
-            )
+            self._thread = threading.Thread(target=self._loop, name="necto-flush", daemon=True)
             self._thread.start()
 
     # -- plumbing ----------------------------------------------------------
@@ -297,9 +290,7 @@ class Necto:
         run_meta.setdefault("sdk_version", __version__)
         return run_meta
 
-    def start_run(
-        self, name: str | None = None, meta: dict[str, Any] | None = None
-    ) -> Run:
+    def start_run(self, name: str | None = None, meta: dict[str, Any] | None = None) -> Run:
         """Create a run and return its handle. Pair with `run.finish()`.
 
         Use this from integrations that cannot use the `with` form.
