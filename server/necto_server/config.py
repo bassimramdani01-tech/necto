@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     api_key: str | None = None
     # When true (NECTO_SEED=1), fill an empty database with demo runs on first boot.
     seed: bool = False
+    # When set (NECTO_WEB_DIR), serve this built web UI from the API at "/".
+    web_dir: str | None = None
 
 
 settings = Settings()

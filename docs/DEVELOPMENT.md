@@ -170,6 +170,18 @@ uv run ruff format --check ..
 pre-commit run --all-files        # from the repo root
 ```
 
+## Self-host (Docker)
+
+```bash
+docker compose up -d --build     # db + API + built UI on :8000
+docker compose logs -f app
+docker compose down              # add -v to also drop the database volume
+```
+
+The image is multi-stage: Node builds the Vite bundle, then a python:3.12-slim stage installs
+the locked server environment, runs `alembic upgrade head` at boot and serves the UI with
+`NECTO_WEB_DIR` (FastAPI static mount). `NECTO_SEED=1` fills a fresh database with demo runs.
+
 ## Network-restricted environments
 
 > As of the last check, `files.pythonhosted.org`, `github.com` and Docker Hub are reachable again,

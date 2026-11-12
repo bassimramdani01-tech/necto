@@ -1020,3 +1020,35 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 ## 27. Polish pass — Tier 2 (usability)
 
 **Server**
+
+---
+
+## 28. Self-host — one command `docker compose up`
+
+**Image** (`Dockerfile`, multi-stage):
+
+1. `node:24-alpine` builds the Vite bundle (`pnpm install --frozen-lockfile --allow-build=esbuild`).
+2. `python:3.12-slim` installs the locked server env with `uv sync --frozen --no-dev`, copies `dist/`,
+   sets `NECTO_WEB_DIR=/app/web`, and at boot runs `alembic upgrade head` then uvicorn.
+
+**Serving the UI from the API:** `NECTO_WEB_DIR` makes `create_app()` mount the built bundle at `/`
+(StaticFiles, `html=True`). Without it the JSON root is unchanged, so tests and the dev workflow are
+unaffected. Two tests cover both branches (`tests/test_web_mount.py`).
+
+**Compose:** new `app` service (depends on db healthcheck, `NECTO_SEED=1`, port 8000).
+`docker compose up -d --build` → UI + API + seeded database on **http://localhost:8000**.
+
+**Verified on a fresh volume:** `docker compose down -v && docker compose up -d` → migrations ran,
+6 demo runs seeded, `/healthz` 200, `/docs` 200, `/` served the real dashboard (6 runs / 142 events /
+$0.08 / 16.2K tokens / 4 errors) — screenshot taken.
+
+**Two build issues found and fixed:**
+
+- `# syntax=docker/dockerfile:1` made the build pull a BuildKit frontend from Docker Hub, which timed
+  out (`DeadlineExceeded`); the directive was unnecessary and was removed.
+- pnpm 12 treats *ignored build scripts as fatal* when `CI=true`, and the old `pnpm.onlyBuiltDependencies`
+  field in `web/package.json` is no longer read (the warning says so). Removed that field (the setting
+  now lives in `pnpm-workspace.yaml`) and made the Docker install explicit with `--allow-build=esbuild`.
+
+**Also fixed in passing:** the `web/package.json` edit above initially left invalid JSON — caught by
+`node -e JSON.parse` and a local `pnpm build` before rebuilding the image.

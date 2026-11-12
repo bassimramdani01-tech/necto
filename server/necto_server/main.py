@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from . import __version__
@@ -41,10 +43,6 @@ def create_app() -> FastAPI:
     app.include_router(live_router)
     app.include_router(query_router)
 
-    @app.get("/")
-    def root() -> dict:
-        return {"name": "necto", "version": __version__, "docs": "/docs", "health": "/healthz"}
-
     @app.get("/healthz")
     def healthz() -> JSONResponse:
         database = "up"
@@ -59,6 +57,21 @@ def create_app() -> FastAPI:
             status_code=200 if database == "up" else 503,
             content={"status": status, "database": database, "version": __version__},
         )
+
+    # Self-host: serve the built web UI from the API when NECTO_WEB_DIR is set.
+    web_root = Path(settings.web_dir) if settings.web_dir else None
+    if web_root is not None and web_root.is_dir():
+        app.mount("/", StaticFiles(directory=str(web_root), html=True), name="web")
+    else:
+
+        @app.get("/")
+        def root() -> dict:
+            return {
+                "name": "necto",
+                "version": __version__,
+                "docs": "/docs",
+                "health": "/healthz",
+            }
 
     return app
 

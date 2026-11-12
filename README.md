@@ -67,6 +67,17 @@ A live run **builds the graph as it happens**, and the **replay scrubber** rebui
 
 ## Quickstart
 
+### One command
+
+```bash
+docker compose up -d --build
+```
+
+Open **<http://localhost:8000>** — the API, the built UI and a seeded database come up together.
+Set `NECTO_SEED: "0"` in `docker-compose.yml` for a clean instance instead of demo data.
+
+### Local development
+
 Requirements: Docker, Python 3.12+, Node 20+.
 
 ```bash

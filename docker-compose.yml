@@ -1,12 +1,15 @@
 # necto self-host stack.
 #
-# NOTE: maps Postgres to host port 5432. If you are running the portable
-# development stand-in (docs/DEVELOPMENT.md, Option A), stop it first:
-#   pg_ctl -D %LOCALAPPDATA%/Programs/necto-tools/pgdata stop
+# One command:
+#   docker compose up -d --build
+#   -> UI + API on http://localhost:8000   (demo data seeded on first boot)
 #
-# Usage:
+# Development still runs the API and UI natively (docs/DEVELOPMENT.md):
 #   docker compose up -d db
-#   docker compose logs -f db
+#
+# NOTE: maps Postgres to host port 5432 for the native workflow. If you are running the
+# portable development Postgres (docs/DEVELOPMENT.md, Option A), stop it first:
+#   pg_ctl -D %LOCALAPPDATA%/Programs/necto-tools/pgdata stop
 
 services:
   db:
@@ -25,6 +28,22 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: necto-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NECTO_DATABASE_URL: postgresql+psycopg://necto:necto@db:5432/necto
+      # Demo runs on a fresh database. Set to 0 for a purely empty instance.
+      NECTO_SEED: "1"
+      NECTO_WEB_DIR: /app/web
+    ports:
+      - "8000:8000"
 
 volumes:
   pgdata:
