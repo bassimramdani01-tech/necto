@@ -14,7 +14,6 @@ import {
   type Edge,
   type EdgeProps,
   type EdgeTypes,
-  type Node,
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
@@ -22,7 +21,13 @@ import "@xyflow/react/dist/style.css";
 
 import { formatCompact, formatMoney } from "../../lib/format";
 import { nodeLabel } from "../../lib/graph";
-import type { GraphEdge, GraphNode, GraphResponse } from "../../lib/types";
+import {
+  COLUMN_WIDTH,
+  GRAPH_ORIGIN,
+  layoutGraph,
+  type GraphNodeData,
+} from "../../lib/layout";
+import type { GraphResponse } from "../../lib/types";
 
 const KIND_ORDER = ["agent", "model", "tool", "state", "external"];
 
@@ -43,11 +48,6 @@ const EDGE_STYLE: Record<string, { color: string; animated: boolean }> = {
   state_write: { color: "#34d399", animated: false },
   error: { color: "#fb7185", animated: false },
 };
-
-interface NodeData extends Record<string, unknown> {
-  node: GraphNode;
-  dimmed?: boolean;
-}
 
 interface EdgeData extends Record<string, unknown> {
   metrics: string;
@@ -101,7 +101,7 @@ const edgeTypes: EdgeTypes = { necto: NectoEdge };
 // node labelling lives in lib/graph so the inspector can share it
 
 function NectoNode({ data }: NodeProps) {
-  const { node, dimmed } = data as NodeData;
+  const { node, dimmed } = data as GraphNodeData;
   const style = KIND_STYLE[node.kind] ?? KIND_STYLE.external;
 
   return (
@@ -133,123 +133,6 @@ function NectoNode({ data }: NodeProps) {
 }
 
 const nodeTypes: NodeTypes = { necto: NectoNode };
-
-/**
- * Ranks nodes by dependency depth (longest path from a source), so the graph reads
- * left-to-right as the workflow actually ran. Columns are ranks, not node kinds —
- * a handoff between two agents then flows forward instead of looping backwards.
- */
-const COLUMN: Record<string, number> = { agent: 0, model: 1, tool: 2, state: 3, external: 4 };
-
-function firstSeen(node: GraphNode): number {
-  const value = node.first_ts ? new Date(node.first_ts).getTime() : 0;
-  return Number.isFinite(value) ? value : 0;
-}
-
-/**
- * Readable layout: agents form the left column in execution order; every other node
- * sits in its kind's column, aligned to the row of the agent that first used it.
- * That keeps calls/tool uses short and horizontal, while agent-to-agent handoffs read
- * as vertical steps down the agent column.
- */
-function byFirstSeen(a: GraphNode, b: GraphNode): number {
-  return firstSeen(a) - firstSeen(b) || a.id.localeCompare(b.id);
-}
-
-/** Order agents by walking handoff edges: the order control actually changed hands. */
-function orderAgents(agents: GraphNode[], edges: GraphEdge[]): GraphNode[] {
-  const byId = new Map(agents.map((agent) => [agent.id, agent]));
-  const indegree = new Map<string, number>();
-  const outgoing = new Map<string, string[]>();
-  for (const agent of agents) {
-    indegree.set(agent.id, 0);
-    outgoing.set(agent.id, []);
-  }
-  for (const edge of edges) {
-    if (edge.kind !== "handoff") continue;
-    if (!byId.has(edge.source) || !byId.has(edge.target) || edge.source === edge.target) continue;
-    outgoing.get(edge.source)?.push(edge.target);
-    indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
-  }
-
-  const queue = agents
-    .filter((agent) => (indegree.get(agent.id) ?? 0) === 0)
-    .sort(byFirstSeen);
-  const ordered: GraphNode[] = [];
-  const seen = new Set<string>();
-
-  while (queue.length > 0) {
-    const agent = queue.shift() as GraphNode;
-    if (seen.has(agent.id)) continue;
-    seen.add(agent.id);
-    ordered.push(agent);
-    for (const nextId of outgoing.get(agent.id) ?? []) {
-      indegree.set(nextId, (indegree.get(nextId) ?? 0) - 1);
-      if ((indegree.get(nextId) ?? 0) === 0) {
-        const next = byId.get(nextId);
-        if (next) queue.push(next);
-      }
-    }
-  }
-
-  const rest = agents.filter((agent) => !seen.has(agent.id)).sort(byFirstSeen);
-  return [...ordered, ...rest];
-}
-
-function layout(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  selectedId: string | null,
-  neighbours: ReadonlySet<string> | null,
-): Node[] {
-  const agents = orderAgents(
-    nodes.filter((node) => node.kind === "agent"),
-    edges,
-  );
-  const others = nodes.filter((node) => node.kind !== "agent").sort(byFirstSeen);
-
-  const rowOfAgent = new Map<string, number>();
-  agents.forEach((agent, row) => rowOfAgent.set(agent.id, row));
-
-  const occupied = new Set<string>();
-  const place = (column: number, row: number): { column: number; row: number } => {
-    let candidate = row;
-    while (occupied.has(column + ":" + candidate)) candidate += 1;
-    occupied.add(column + ":" + candidate);
-    return { column, row: candidate };
-  };
-
-  const positioned: Node[] = [];
-  const push = (node: GraphNode, column: number, row: number) => {
-    const spot = place(column, row);
-    positioned.push({
-      id: node.id,
-      type: "necto",
-      position: { x: 40 + spot.column * 300, y: 40 + spot.row * 140 },
-      data: { node, dimmed: neighbours ? !neighbours.has(node.id) : false } as NodeData,
-      selected: node.id === selectedId,
-    });
-  };
-
-  agents.forEach((agent, row) => push(agent, COLUMN.agent, row));
-
-  for (const node of others) {
-    const column = COLUMN[node.kind] ?? COLUMN.external;
-    let row = 0;
-    let anchored = false;
-    for (const edge of edges) {
-      if (edge.target === node.id && rowOfAgent.has(edge.source)) {
-        row = rowOfAgent.get(edge.source) as number;
-        anchored = true;
-        break;
-      }
-    }
-    if (!anchored) row = agents.length + column;
-    push(node, column, row);
-  }
-
-  return positioned;
-}
 
 const NO_HIGHLIGHT: ReadonlySet<string> = new Set<string>();
 
@@ -366,13 +249,13 @@ function GraphCanvasInner({
   }, [selectedId, graph.edges]);
 
   const nodes = useMemo(
-    () => layout(graph.nodes, graph.edges, selectedId, neighbours),
+    () => layoutGraph(graph.nodes, graph.edges, selectedId, neighbours),
     [graph.nodes, graph.edges, selectedId, neighbours],
   );
   const edges = useMemo(() => {
     const columnOf = new Map<string, number>();
     for (const node of nodes) {
-      columnOf.set(node.id, Math.round((node.position.x - 40) / 300));
+      columnOf.set(node.id, Math.round((node.position.x - GRAPH_ORIGIN) / COLUMN_WIDTH));
     }
     return buildEdges(graph, columnOf, highlightEdgeIds, selectedId, neighbours);
   }, [graph, nodes, highlightEdgeIds, selectedId, neighbours]);

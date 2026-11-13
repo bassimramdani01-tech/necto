@@ -1029,26 +1029,24 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 1. `node:24-alpine` builds the Vite bundle (`pnpm install --frozen-lockfile --allow-build=esbuild`).
 2. `python:3.12-slim` installs the locked server env with `uv sync --frozen --no-dev`, copies `dist/`,
-   sets `NECTO_WEB_DIR=/app/web`, and at boot runs `alembic upgrade head` then uvicorn.
 
-**Serving the UI from the API:** `NECTO_WEB_DIR` makes `create_app()` mount the built bundle at `/`
-(StaticFiles, `html=True`). Without it the JSON root is unchanged, so tests and the dev workflow are
-unaffected. Two tests cover both branches (`tests/test_web_mount.py`).
+---
 
-**Compose:** new `app` service (depends on db healthcheck, `NECTO_SEED=1`, port 8000).
-`docker compose up -d --build` → UI + API + seeded database on **http://localhost:8000**.
+## 29. Polish pass — Tier 3 #2 (frontend tests)
 
-**Verified on a fresh volume:** `docker compose down -v && docker compose up -d` → migrations ran,
-6 demo runs seeded, `/healthz` 200, `/docs` 200, `/` served the real dashboard (6 runs / 142 events /
-$0.08 / 16.2K tokens / 4 errors) — screenshot taken.
+**Refactor first:** the graph layout (`orderAgents`, `layoutGraph`, column/row geometry) lived inside
+`GraphCanvas.tsx` and could not be tested. It moved to `web/src/lib/layout.ts` as a pure function over
+`GraphNode[]` / `GraphEdge[]`; the canvas now imports it. Build + screenshots unchanged.
 
-**Two build issues found and fixed:**
+**Vitest + jsdom** (`vitest.config.ts`, `pnpm test`), 4 files, **31 tests**:
 
-- `# syntax=docker/dockerfile:1` made the build pull a BuildKit frontend from Docker Hub, which timed
-  out (`DeadlineExceeded`); the directive was unnecessary and was removed.
-- pnpm 12 treats *ignored build scripts as fatal* when `CI=true`, and the old `pnpm.onlyBuiltDependencies`
-  field in `web/package.json` is no longer read (the warning says so). Removed that field (the setting
-  now lives in `pnpm-workspace.yaml`) and made the Docker install explicit with `--allow-build=esbuild`.
+| File | Covers |
+|---|---|
+| `src/lib/projectGraph.test.ts` (7) | replay projection: empty graph, agent metadata, llm_call attribution to both ends with totals counted once, failed tool_result → edge error, error events on nodes, slice-only projection, aggregate mode |
+| `src/lib/layout.test.ts` (7) | handoff-chain ordering (and cycle safety), per-kind columns, no overlapping positions, models aligned to the calling agent, unanchored stacking, selection dimming |
+| `src/lib/format.test.ts` (11) | money precision, thousands/compact, relative units, durations, invalid input |
+| `src/store/ui.test.ts` (6) | URL round-trip: initial view/status/run, defaults, view write/remove, clearing `at`/`node`/`edge` on run change |
 
-**Also fixed in passing:** the `web/package.json` edit above initially left invalid JSON — caught by
-`node -e JSON.parse` and a local `pnpm build` before rebuilding the image.
+**Verified:** `pnpm test` → 31 passed; `pnpm build` still green with test files in the tree.
+
+**Totals:** server **84**, SDK **52 (+1 skipped)**, web **31** — 167 tests.

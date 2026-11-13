@@ -156,6 +156,10 @@ Database:
 cd sdk
 uv sync                      # own venv, own uv.lock
 uv run pytest -q             # 52 tests
+
+# --- web ---
+cd ../web
+pnpm test                    # 31 vitest tests (pure logic + URL-synced store)
 uv sync --group frameworks   # optional: adds langgraph for the real-framework tests
 uv build                     # wheel + sdist in sdk/dist/
 ```
