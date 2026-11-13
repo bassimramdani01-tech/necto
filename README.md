@@ -206,6 +206,17 @@ pnpm install
 pnpm dev            # http://localhost:5173  (proxies /v1 + WebSocket to :8000)
 ``` 
 
+### One command
+
+```bash
+./scripts/dev.ps1                 # database + migrations + API + UI (Ctrl+C stops the servers)
+./scripts/dev.ps1 -CheckOnly      # validate prerequisites and print the plan
+./scripts/dev.ps1 -ApiPort 8001   # if 8000 is taken
+```
+
+Reset the database (schema stays): `cd server && uv run python ../scripts/reset.py --yes`
+(add `--seed 6` to refill demo data).
+
 ### Tests
 
 ```bash

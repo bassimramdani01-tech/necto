@@ -174,6 +174,16 @@ uv run ruff format --check ..
 pre-commit run --all-files        # from the repo root
 ```
 
+## Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/dev.ps1` | one command for database + migrations + API + UI (`-CheckOnly`, `-ApiPort`, `-WebPort`, `-NoSeed`, `-NoDb`) |
+| `scripts/reset.py` | truncate runs/events/registries, optionally re-seed demo runs (`--seed N`) |
+| `scripts/demo.py` | generate a realistic demo run against a server |
+| `scripts/demo_gif.py` | regenerate the README hero GIF |
+| `scripts/backfill_registries.py` | rebuild the agent/model registries from events |
+
 ## Self-host (Docker)
 
 ```bash

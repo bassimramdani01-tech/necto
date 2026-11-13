@@ -1034,16 +1034,18 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 ---
 
-## 30. Polish pass — Tier 3 #3 (SDK hardening)
+---
 
-| Change | Detail |
+## 31. Polish pass - Tier 3 #4 (dev scripts)
+
+| Script | What it does |
 |---|---|
-| **429 + `Retry-After`** | a 429 was previously treated as any 4xx and dropped; now it is retried, honouring an integer or HTTP-date `Retry-After` header (capped at 30 s) and falling back to the normal backoff when absent |
-| **`atexit` flush** | `Necto.__init__` registers `close`, so buffered events are shipped at interpreter exit even if the app forgets `close()` |
-| **Idempotent `close()`** | a `_closed` guard makes double-close (explicit + atexit) harmless |
-| **`Necto.from_env()`** | reads `NECTO_ENDPOINT`, `NECTO_API_KEY`, `NECTO_FRAMEWORK`, `NECTO_ENABLED` (`0/false/no/off` disables); keyword overrides win |
+| `scripts/dev.ps1` | one command: starts the db (waits for healthy), applies migrations, starts uvicorn and vite with the proxy wired, prints both URLs, and stops both servers on exit. `-CheckOnly` validates docker/uv/pnpm and prints the plan; `-ApiPort`, `-WebPort`, `-NoSeed`, `-NoDb` for variants. Tools resolve from the portable install or PATH. |
+| `scripts/reset.py` | truncates `events, runs, agents, models` (schema untouched), asks for confirmation unless `--yes`, and can re-seed demo runs with `--seed N`. |
 
-**Tests:** +9 (`test_transport.py`: retry-after seconds, backoff fallback, give-up, HTTP-date;
-`test_tracer.py`: env config, disabled mode, kwargs override, atexit flush, double close).
+**Verified:** `dev.ps1 -CheckOnly` under Windows PowerShell 5.1; a full smoke run on `-ApiPort 8001 -WebPort 5174 -NoDb -NoSeed` brought both servers up in ~4 s (healthz 200, Vite ready), and the process tree shut down cleanly with the ports released. `reset.py --yes --seed 6` deleted 142 events / 6 runs / 4 agents / 2 models and re-seeded 6 demo runs (API confirmed `X-Total-Count: 6`).
 
-**Totals:** server **84**, SDK **61 (+1 skipped)**, web **31** — 176 tests.
+**Two issues found:**
+
+- `pwsh` (PowerShell 7) is not installed on this machine; the script is written for Windows PowerShell 5.1 as well.
+- PowerShell 5.1 reads BOM-less files as ANSI, so the em dashes in a thrown message broke parsing. The script is now pure ASCII, and `pwsh`'s own help text avoids non-ASCII.
