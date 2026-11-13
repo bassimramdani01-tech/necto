@@ -163,3 +163,71 @@ def test_no_background_thread_when_nothing_can_deliver():
         assert necto._thread is None
     finally:
         necto.close()
+
+
+def test_from_env_reads_endpoint_key_and_framework(monkeypatch):
+    monkeypatch.setenv("NECTO_ENDPOINT", "http://localhost:9999")
+    monkeypatch.setenv("NECTO_API_KEY", "secret")
+    monkeypatch.setenv("NECTO_FRAMEWORK", "langgraph")
+
+    necto = Necto.from_env()
+    necto.close()
+
+    assert necto.framework == "langgraph"
+    assert necto._transport.endpoint == "http://localhost:9999"
+    assert necto._transport.api_key == "secret"
+
+
+def test_from_env_can_be_disabled(monkeypatch):
+    from necto_sdk import NullTransport
+
+    monkeypatch.setenv("NECTO_ENDPOINT", "http://localhost:9999")
+    monkeypatch.setenv("NECTO_ENABLED", "off")
+
+    necto = Necto.from_env()
+    necto.close()
+
+    assert necto.enabled is False
+    assert isinstance(necto._transport, NullTransport)
+
+
+def test_from_env_kwargs_override_environment(monkeypatch):
+    monkeypatch.setenv("NECTO_FRAMEWORK", "langgraph")
+
+    transport = RecordingTransport()
+    necto = Necto.from_env(transport=transport, framework="custom")
+    necto.close()
+
+    assert necto.framework == "custom"
+    assert necto._transport is transport
+
+
+def test_atexit_flushes_on_exit(monkeypatch):
+    import necto_sdk.tracer as tracer_module
+
+    registered = []
+    monkeypatch.setattr(
+        tracer_module.atexit, "register", lambda fn, *args, **kwargs: registered.append(fn)
+    )
+
+    necto, transport = make_tracer()
+    with necto.run(name="atexit-demo") as run:
+        run.handoff("a", "b")
+
+    # Simulate interpreter exit running the registered callback (no explicit close()).
+    for callback in registered:
+        callback()
+
+    assert [event["type"] for event in transport.all_events()] == ["handoff"]
+
+
+def test_close_is_idempotent(monkeypatch):
+    necto, transport = make_tracer()
+    with necto.run(name="close-twice") as run:
+        run.handoff("a", "b")
+
+    necto.close()
+    necto.close()
+
+    assert len(transport.all_events()) == 1
+    assert len(transport.runs) == 1

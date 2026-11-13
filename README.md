@@ -6,7 +6,7 @@
 tools, and it renders the whole thing as one interactive network graph — so you can see how your AI
 actually works, instead of piecing it together from logs.
 
-![tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-176%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![node](https://img.shields.io/badge/node-20%2B-yellow)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -136,6 +136,19 @@ graph.invoke(inputs, config={"callbacks": [handler]})
 The SDK has **zero runtime dependencies**, buffers events and flushes them in the background, and
 **never raises into your app** — if the server is down, events are dropped and logged.
 
+Configure it once from the environment with `Necto.from_env()` — it reads `NECTO_ENDPOINT`,
+`NECTO_API_KEY`, `NECTO_FRAMEWORK` and `NECTO_ENABLED` (`0` disables shipping entirely):
+
+```python
+from necto_sdk import Necto
+
+necto = Necto.from_env()
+```
+
+Robustness details: a `429` is retried **honouring `Retry-After`** (other 4xx are not retried),
+buffered events are flushed at interpreter exit even if you forget `close()`, and `close()` is
+safe to call twice.
+
 ```bash
 pip install -e sdk/
 ``` 
@@ -155,7 +168,7 @@ normative [docs/SCHEMA.md](docs/SCHEMA.md).
 | Piece | State |
 |---|---|
 | Backend — ingestion, graph, query, live WebSocket | ✅ done · **84 tests** |
-| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **52 tests** (incl. a real LangGraph run) |
+| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **61 tests** (incl. a real LangGraph run) |
 | Web UI — runs, graph, live, replay, inspector, stats | ✅ done · **31 tests** (vitest) |
 | Self-host via `docker compose` | ✅ verified (PostgreSQL 16 in Docker) |
 | CI, PyPI release, GitHub release | ⬜ Phase 5 |

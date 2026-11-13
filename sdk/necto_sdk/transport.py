@@ -13,6 +13,8 @@ import logging
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,30 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 5.0
 DEFAULT_ATTEMPTS = 2
 DEFAULT_BACKOFF = 0.25
+# Never let a server's Retry-After stall the host app for longer than this.
+MAX_RETRY_AFTER = 30.0
+
+
+def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
+    """Parse a 429 Retry-After header (seconds or HTTP-date)."""
+    headers = getattr(exc, "headers", None)
+    raw = headers.get("Retry-After") if headers is not None else None
+    if not raw:
+        return None
+    value = str(raw).strip()
+    try:
+        return max(0.0, float(int(value)))
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - datetime.now(UTC)).total_seconds())
 
 
 class Transport(Protocol):
@@ -113,7 +139,16 @@ class HttpTransport:
                     self.attempts,
                     detail,
                 )
-                # 4xx means we sent something wrong; retrying cannot help.
+                # 429 is the one 4xx worth retrying — respect Retry-After when present.
+                if exc.code == 429:
+                    if attempt >= self.attempts:
+                        return None
+                    delay = _retry_after_seconds(exc)
+                    if delay is None:
+                        delay = self.backoff * attempt
+                    time.sleep(min(max(delay, 0.0), MAX_RETRY_AFTER))
+                    continue
+                # Any other 4xx means we sent something wrong; retrying cannot help.
                 if 400 <= exc.code < 500:
                     return None
             except Exception as exc:  # noqa: BLE001 - transport must never break the host app

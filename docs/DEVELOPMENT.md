@@ -155,7 +155,7 @@ Database:
 ```bash
 cd sdk
 uv sync                      # own venv, own uv.lock
-uv run pytest -q             # 52 tests
+uv run pytest -q             # 61 tests
 
 # --- web ---
 cd ../web

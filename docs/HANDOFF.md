@@ -1032,21 +1032,18 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 ---
 
-## 29. Polish pass — Tier 3 #2 (frontend tests)
+---
 
-**Refactor first:** the graph layout (`orderAgents`, `layoutGraph`, column/row geometry) lived inside
-`GraphCanvas.tsx` and could not be tested. It moved to `web/src/lib/layout.ts` as a pure function over
-`GraphNode[]` / `GraphEdge[]`; the canvas now imports it. Build + screenshots unchanged.
+## 30. Polish pass — Tier 3 #3 (SDK hardening)
 
-**Vitest + jsdom** (`vitest.config.ts`, `pnpm test`), 4 files, **31 tests**:
-
-| File | Covers |
+| Change | Detail |
 |---|---|
-| `src/lib/projectGraph.test.ts` (7) | replay projection: empty graph, agent metadata, llm_call attribution to both ends with totals counted once, failed tool_result → edge error, error events on nodes, slice-only projection, aggregate mode |
-| `src/lib/layout.test.ts` (7) | handoff-chain ordering (and cycle safety), per-kind columns, no overlapping positions, models aligned to the calling agent, unanchored stacking, selection dimming |
-| `src/lib/format.test.ts` (11) | money precision, thousands/compact, relative units, durations, invalid input |
-| `src/store/ui.test.ts` (6) | URL round-trip: initial view/status/run, defaults, view write/remove, clearing `at`/`node`/`edge` on run change |
+| **429 + `Retry-After`** | a 429 was previously treated as any 4xx and dropped; now it is retried, honouring an integer or HTTP-date `Retry-After` header (capped at 30 s) and falling back to the normal backoff when absent |
+| **`atexit` flush** | `Necto.__init__` registers `close`, so buffered events are shipped at interpreter exit even if the app forgets `close()` |
+| **Idempotent `close()`** | a `_closed` guard makes double-close (explicit + atexit) harmless |
+| **`Necto.from_env()`** | reads `NECTO_ENDPOINT`, `NECTO_API_KEY`, `NECTO_FRAMEWORK`, `NECTO_ENABLED` (`0/false/no/off` disables); keyword overrides win |
 
-**Verified:** `pnpm test` → 31 passed; `pnpm build` still green with test files in the tree.
+**Tests:** +9 (`test_transport.py`: retry-after seconds, backoff fallback, give-up, HTTP-date;
+`test_tracer.py`: env config, disabled mode, kwargs override, atexit flush, double close).
 
-**Totals:** server **84**, SDK **52 (+1 skipped)**, web **31** — 167 tests.
+**Totals:** server **84**, SDK **61 (+1 skipped)**, web **31** — 176 tests.

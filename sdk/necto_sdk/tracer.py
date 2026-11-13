@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
+import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -239,6 +241,10 @@ class Necto:
         self._buffer: list[tuple[str, dict[str, Any]]] = []
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._closed = False
+        # Best effort: if the app forgets close(), flush on interpreter exit instead of
+        # silently dropping buffered events.
+        atexit.register(self.close)
         # No point running a flusher when nothing can be delivered.
         if enabled and background and not isinstance(self._transport, NullTransport):
             self._thread = threading.Thread(target=self._loop, name="necto-flush", daemon=True)
@@ -310,11 +316,37 @@ class Necto:
             run.finish()
 
     def close(self) -> None:
-        """Stop the background thread and flush remaining events."""
+        """Stop the background thread and flush remaining events (safe to call twice)."""
+        if self._closed:
+            return
+        self._closed = True
         self._stop.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self.flush()
+
+    @classmethod
+    def from_env(cls, prefix: str = "NECTO_", **overrides: Any) -> Necto:
+        """Build a tracer from environment variables.
+
+        Reads {prefix}ENDPOINT, {prefix}API_KEY, {prefix}FRAMEWORK and {prefix}ENABLED
+        (0/false/no/off disables shipping). Keyword overrides win.
+        """
+        env = os.environ
+        enabled_raw = env.get(f"{prefix}ENABLED")
+        enabled = (
+            True
+            if enabled_raw is None
+            else enabled_raw.strip().lower() not in {"0", "false", "no", "off"}
+        )
+        options: dict[str, Any] = {
+            "endpoint": env.get(f"{prefix}ENDPOINT"),
+            "api_key": env.get(f"{prefix}API_KEY"),
+            "framework": env.get(f"{prefix}FRAMEWORK"),
+            "enabled": enabled,
+        }
+        options.update(overrides)
+        return cls(**options)
 
     def __enter__(self) -> Necto:
         return self
