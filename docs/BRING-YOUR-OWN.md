@@ -58,10 +58,12 @@ Use the plain tracer when you have your own orchestration:
 ```python
 from necto_sdk import Necto
 
-necto = Necto.from_env()          # NECTO_ENDPOINT / NECTO_API_KEY / NECTO_FRAMEWORK
+necto = Necto.from_env()  # NECTO_ENDPOINT / NECTO_API_KEY / NECTO_FRAMEWORK
 with necto.run(name="my-pipeline") as run:
     run.agent_start("planner", name="Planner")
-    run.llm_call("planner", "openai", "gpt-4o-mini", input_tokens=812, output_tokens=95, cost_usd=0.0021)
+    run.llm_call(
+        "planner", "openai", "gpt-4o-mini", input_tokens=812, output_tokens=95, cost_usd=0.0021
+    )
     run.handoff("planner", "writer", reason="draft ready")
     run.tool_call("writer", "publish")
     run.tool_result("publish", "writer", ok=True, latency_ms=90)

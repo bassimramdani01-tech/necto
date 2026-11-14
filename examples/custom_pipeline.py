@@ -11,6 +11,7 @@ step is recorded as necto events, so the resulting graph is your real architectu
 Providers: openai (including any OpenAI-compatible base_url, e.g. Ollama/vLLM/OpenRouter),
 anthropic, and mock (deterministic, for wiring tests).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -132,10 +133,9 @@ def call_model(spec: dict, prompt: str, system: str, dry_run: bool) -> dict:
 
     latency_ms = int((time.perf_counter() - started) * 1000)
     rates = spec.get("rates") or {}
-    cost_usd = (
-        input_tokens / 1000 * float(rates.get("input_per_1k", 0))
-        + output_tokens / 1000 * float(rates.get("output_per_1k", 0))
-    )
+    cost_usd = input_tokens / 1000 * float(
+        rates.get("input_per_1k", 0)
+    ) + output_tokens / 1000 * float(rates.get("output_per_1k", 0))
     return {
         "provider": provider,
         "model": model,
@@ -147,7 +147,9 @@ def call_model(spec: dict, prompt: str, system: str, dry_run: bool) -> dict:
     }
 
 
-def run_pipeline(config: dict, necto: Necto, prompt: str, dry_run: bool) -> tuple[str | None, list[str]]:
+def run_pipeline(
+    config: dict, necto: Necto, prompt: str, dry_run: bool
+) -> tuple[str | None, list[str]]:
     """Execute the configured flow, recording each step through the tracer."""
     models = config.get("models") or {}
     tools = config.get("tools") or {}
@@ -193,9 +195,13 @@ def run_pipeline(config: dict, necto: Necto, prompt: str, dry_run: bool) -> tupl
             reply = result["reply"]
             for tool_id in agent.get("tools", []):
                 tool = tools.get(tool_id, {})
-                run.tool_call(agent_id, tool_id, name=tool.get("name", tool_id), input_snippet=current[:80])
+                run.tool_call(
+                    agent_id, tool_id, name=tool.get("name", tool_id), input_snippet=current[:80]
+                )
                 tool_reply = tool.get("reply", "(no reply configured)")
-                run.tool_result(tool_id, agent_id, ok=True, latency_ms=40, output_snippet=str(tool_reply)[:120])
+                run.tool_result(
+                    tool_id, agent_id, ok=True, latency_ms=40, output_snippet=str(tool_reply)[:120]
+                )
                 reply = f"{reply}\n[{tool_id}] {tool_reply}"
 
             run.agent_finish(agent_id, output_snippet=reply[:160])
@@ -208,12 +214,22 @@ def run_pipeline(config: dict, necto: Necto, prompt: str, dry_run: bool) -> tupl
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--config", default=str(Path(__file__).with_name("custom_pipeline.example.json")))
-    parser.add_argument("--prompt", default="Customer says they were charged twice for order #5512. Resolve it.")
-    parser.add_argument("--endpoint", default=os.environ.get("NECTO_ENDPOINT", "http://127.0.0.1:8000"))
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--config", default=str(Path(__file__).with_name("custom_pipeline.example.json"))
+    )
+    parser.add_argument(
+        "--prompt", default="Customer says they were charged twice for order #5512. Resolve it."
+    )
+    parser.add_argument(
+        "--endpoint", default=os.environ.get("NECTO_ENDPOINT", "http://127.0.0.1:8000")
+    )
     parser.add_argument("--api-key", default=os.environ.get("NECTO_API_KEY"))
-    parser.add_argument("--dry-run", action="store_true", help="simulate replies; no API keys needed")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="simulate replies; no API keys needed"
+    )
     parser.add_argument("--ui", default=os.environ.get("NECTO_UI", "http://localhost:5173"))
     return parser.parse_args()
 

@@ -56,5 +56,7 @@ def test_unknown_model_reference_is_a_clear_error():
 def test_missing_key_gives_actionable_error(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(custom_pipeline.ProviderError) as info:
-        custom_pipeline.call_model({"provider": "openai", "model": "gpt-4o-mini"}, "hi", "", dry_run=False)
+        custom_pipeline.call_model(
+            {"provider": "openai", "model": "gpt-4o-mini"}, "hi", "", dry_run=False
+        )
     assert "OPENAI_API_KEY" in str(info.value)
