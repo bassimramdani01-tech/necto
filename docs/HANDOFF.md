@@ -1108,3 +1108,32 @@ documented to pass `--ui http://localhost:8000` when deployed).
 **Added:** `docs/COPILOT_PUSH_PROMPT.md`, a guarded command prompt for GitHub Copilot that
 re-runs the preflight, creates the repo, pushes, triages CI, enables private vulnerability
 reporting, and stops for the human before PyPI.
+
+---
+
+## 34. Stats hover fix + bring-your-own agents/models
+
+**Stats hover artifact.** Recharts draws a light-grey `cursor` rectangle on hover and can repaint
+the active bar; on the dark theme that read as an unnatural colour flash. All bar tooltips now use
+`cursor={false}` (tooltips still work) and every `<Bar>` pins `activeBar` to its own fill. Verified
+by driving real mouse events through Edge DevTools Protocol and screenshotting before/after: the
+tooltip appears, bars and pie keep their exact colours, no rectangle.
+
+**Bring your own agents and models.** New `examples/custom_pipeline.py` + `custom_pipeline.example.json`
+let users describe their architecture in JSON/YAML:
+
+- models (openai — including any OpenAI-compatible `base_url`, anthropic, mock) with per-1k rates,
+- agents (id, name, model, system prompt, tools, handoff reason),
+- tools (simple replies), and a `flow` of agent ids.
+
+The runner executes the flow, makes **real model calls** when a key is present, and records
+`run_start`, `agent_start`, `llm_call` (real tokens/cost/latency), `tool_call`/`tool_result`,
+`handoff` and `agent_finish`. `--dry-run` keeps the real provider/model refs (so the graph shows
+the real architecture) and only fakes the reply text.
+
+**Verified:** `--dry-run` against the running stack produced a `support-desk` run (15 events)
+whose UI graph shows Triage -> Billing (tool) -> Reply writer with `openai:gpt-4o-mini` and
+`anthropic:claude-sonnet-4` nodes. Three tests cover the runner (event sequence, unknown model,
+missing key) -> SDK **64 passed, 1 skipped**.
+
+Docs: `docs/BRING-YOUR-OWN.md` (three levels: config runner, own code + SDK, framework adapters).

@@ -28,6 +28,11 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
   color: "#e2e8f0",
 };
+// Recharts defaults the hover cursor to a light grey rectangle and repaints the active
+// bar; on a dark theme that reads as an unnatural colour flash. Disable the cursor
+// rectangle (tooltips still work) and pin each bar's hover colour to its own fill.
+const activeBar = (fill: string) => ({ fill, stroke: "none" });
+
 const PIE_COLORS = [
   "#38bdf8",
   "#a78bfa",
@@ -195,10 +200,11 @@ export function StatsView() {
                 <XAxis dataKey="name" stroke={AXIS_STROKE} tick={AXIS_TICK} interval={0} height={44} angle={-15} textAnchor="end" />
                 <YAxis stroke={AXIS_STROKE} tick={AXIS_TICK} />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(value) => [`$${Number(value).toFixed(4)}`, "cost"]}
                 />
-                <Bar dataKey="cost_usd" fill="#a78bfa" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="cost_usd" fill="#a78bfa" radius={[4, 4, 0, 0]} isAnimationActive={false}  activeBar={activeBar("#a78bfa")} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -214,6 +220,7 @@ export function StatsView() {
                 <XAxis dataKey="name" stroke={AXIS_STROKE} tick={AXIS_TICK} interval={0} height={44} angle={-15} textAnchor="end" />
                 <YAxis stroke={AXIS_STROKE} tick={AXIS_TICK} />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(value, name, item) => {
                     if (name === "calls") {
@@ -223,7 +230,7 @@ export function StatsView() {
                     return [String(value), String(name)];
                   }}
                 />
-                <Bar dataKey="calls" name="calls" fill="#38bdf8" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="calls" name="calls" fill="#38bdf8" radius={[4, 4, 0, 0]} isAnimationActive={false}  activeBar={activeBar("#38bdf8")} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -238,8 +245,8 @@ export function StatsView() {
                 <CartesianGrid stroke={GRID} horizontal={false} />
                 <XAxis type="number" stroke={AXIS_STROKE} tick={AXIS_TICK} />
                 <YAxis type="category" dataKey="name" stroke={AXIS_STROKE} tick={AXIS_TICK} width={90} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Bar dataKey="calls" fill="#38bdf8" radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} />
+                <Bar dataKey="calls" fill="#38bdf8" radius={[0, 4, 4, 0]} isAnimationActive={false}  activeBar={activeBar("#38bdf8")} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -255,10 +262,11 @@ export function StatsView() {
                 <XAxis dataKey="name" stroke={AXIS_STROKE} tick={AXIS_TICK} interval={0} height={44} angle={-15} textAnchor="end" />
                 <YAxis stroke={AXIS_STROKE} tick={AXIS_TICK} />
                 <Tooltip
+                  cursor={false}
                   contentStyle={TOOLTIP_STYLE}
                   formatter={(value) => [`${Number(value)} ms`, "avg latency"]}
                 />
-                <Bar dataKey="avg_latency_ms" fill="#fbbf24" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="avg_latency_ms" fill="#fbbf24" radius={[4, 4, 0, 0]} isAnimationActive={false}  activeBar={activeBar("#fbbf24")} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -275,7 +283,7 @@ export function StatsView() {
                     <Cell key={entry.type} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Tooltip cursor={false} contentStyle={TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 11, color: "#94a3b8" }} />
               </PieChart>
             </ResponsiveContainer>

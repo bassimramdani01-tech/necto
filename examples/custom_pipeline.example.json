@@ -1,0 +1,58 @@
+{
+  "name": "support-desk",
+  "framework": "custom",
+  "models": {
+    "fast": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "rates": {
+        "input_per_1k": 0.00015,
+        "output_per_1k": 0.0006
+      }
+    },
+    "smart": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4",
+      "rates": {
+        "input_per_1k": 0.003,
+        "output_per_1k": 0.015
+      }
+    }
+  },
+  "tools": {
+    "lookup_invoice": {
+      "name": "lookup_invoice",
+      "reply": "invoice #5512: two charges on 2026-03-02 (duplicate)"
+    }
+  },
+  "agents": [
+    {
+      "id": "triage",
+      "name": "Triage",
+      "model": "fast",
+      "system": "Classify the customer request."
+    },
+    {
+      "id": "billing",
+      "name": "Billing",
+      "model": "smart",
+      "system": "Resolve billing issues using the invoice lookup tool.",
+      "tools": [
+        "lookup_invoice"
+      ],
+      "handoff_reason": "billing specialist needed"
+    },
+    {
+      "id": "writer",
+      "name": "Reply writer",
+      "model": "fast",
+      "system": "Write a short, friendly customer reply.",
+      "handoff_reason": "send the reply"
+    }
+  ],
+  "flow": [
+    "triage",
+    "billing",
+    "writer"
+  ]
+}

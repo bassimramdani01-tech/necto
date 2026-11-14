@@ -6,7 +6,7 @@
 tools, and it renders the whole thing as one interactive network graph — so you can see how your AI
 actually works, instead of piecing it together from logs.
 
-![tests](https://img.shields.io/badge/tests-176%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-179%20passing-brightgreen)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![node](https://img.shields.io/badge/node-20%2B-yellow)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -133,6 +133,10 @@ graph.invoke(inputs, config={"callbacks": [handler]})
 | OpenTelemetry | `instrument(necto)` from `necto_sdk.adapters.otel` |
 | Anything else | plain tracer: `run.agent_start()` / `handoff()` / `llm_call()` / `tool_call()` |
 
+Want to define **your own agents, models, tools and handoffs** instead of using a framework? See
+[Bring your own agents and models](docs/BRING-YOUR-OWN.md) — a JSON-configured pipeline runner that
+makes real OpenAI / Anthropic calls (with a dry-run mode that needs no keys).
+
 The SDK has **zero runtime dependencies**, buffers events and flushes them in the background, and
 **never raises into your app** — if the server is down, events are dropped and logged.
 
@@ -168,7 +172,7 @@ normative [docs/SCHEMA.md](docs/SCHEMA.md).
 | Piece | State |
 |---|---|
 | Backend — ingestion, graph, query, live WebSocket | ✅ done · **84 tests** |
-| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **61 tests** (incl. a real LangGraph run) |
+| Python SDK — tracer + LangGraph / OpenAI Agents / OpenTelemetry | ✅ done · **64 tests** (incl. a real LangGraph run) |
 | Web UI — runs, graph, live, replay, inspector, stats | ✅ done · **31 tests** (vitest) |
 | Self-host via `docker compose` | ✅ verified (PostgreSQL 16 in Docker) |
 | CI, PyPI release, GitHub release | ⬜ Phase 5 |
@@ -221,7 +225,7 @@ Reset the database (schema stays): `cd server && uv run python ../scripts/reset.
 
 ```bash
 cd server && uv run pytest -q          # 84 server tests
-cd ../sdk && uv run pytest -q          # 52 SDK tests (uv manages the SDK venv)
+cd ../sdk && uv run pytest -q          # 64 SDK tests (uv manages the SDK venv)
 cd ../web && pnpm test                 # 31 frontend tests (vitest)
 
 # lint (repo-wide, from server/)

@@ -5,6 +5,7 @@ Runnable ways to get data into necto — from "no dependencies" to real model pr
 | Example | Needs | Shows |
 |---|---|---|
 | [`plain_sdk.py`](plain_sdk.py) | nothing | the tracer API: agents, an llm_call, a handoff, a tool round-trip |
+| [`custom_pipeline.py`](custom_pipeline.py) | nothing (`--dry-run`) or `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | define **your own** models, agents, tools and handoffs in JSON and run it for real |
 | [`langgraph_app.py`](langgraph_app.py) | `pip install langgraph langchain-openai` + `OPENAI_API_KEY` | real LangGraph app with real token usage, mapped automatically |
 | [`openai_agents_app.py`](openai_agents_app.py) | `pip install openai-agents` + `OPENAI_API_KEY` | OpenAI Agents SDK with a real handoff between two agents |
 
