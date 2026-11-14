@@ -1,5 +1,5 @@
 # ---------- build the web UI ----------
-FROM node:24-alpine AS web
+FROM node:25-alpine AS web
 WORKDIR /web
 ENV CI=true
 RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
