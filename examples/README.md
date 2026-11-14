@@ -15,7 +15,8 @@ Start the server first (`cd server && uv run uvicorn necto_server.main:app --rel
 python examples/plain_sdk.py
 ```
 
-Each script prints the run id and a ready-to-open UI link.
+Each script prints the run id and a ready-to-open UI link. The default link targets the dev
+server (`:5173`); when you deployed with `docker compose up`, pass `--ui http://localhost:8000`.
 
 ## Adding your own agents and models
 
