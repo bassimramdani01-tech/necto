@@ -17,7 +17,9 @@ TABLES = ("events", "runs", "agents", "models")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     parser.add_argument(
         "--seed",
