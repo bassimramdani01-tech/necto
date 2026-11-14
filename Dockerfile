@@ -9,7 +9,7 @@ COPY web/ ./
 RUN pnpm build
 
 # ---------- API + static UI ----------
-FROM python:3.12-slim AS api
+FROM python:3.15-slim AS api
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
