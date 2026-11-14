@@ -1036,16 +1036,46 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 ---
 
-## 31. Polish pass - Tier 3 #4 (dev scripts)
+---
 
-| Script | What it does |
+## 32. Debugging session + Phase 5 start (CI and release rails)
+
+### Debugging session
+
+Golden path first: **84 server + 61 SDK + 31 web** tests green, ruff/pre-commit clean (one
+formatting fix in `scripts/reset.py`). Then runtime probes against the containerised stack:
+
+| Probe | Result |
 |---|---|
-| `scripts/dev.ps1` | one command: starts the db (waits for healthy), applies migrations, starts uvicorn and vite with the proxy wired, prints both URLs, and stops both servers on exit. `-CheckOnly` validates docker/uv/pnpm and prints the plan; `-ApiPort`, `-WebPort`, `-NoSeed`, `-NoDb` for variants. Tools resolve from the portable install or PATH. |
-| `scripts/reset.py` | truncates `events, runs, agents, models` (schema untouched), asks for confirmation unless `--yes`, and can re-seed demo runs with `--seed N`. |
+| invalid uuid / missing run / graph+stats 404 | pass (422 / 404) |
+| `limit=0`, empty event batch | pass (422) |
+| `offset` past the end, `after_seq` past the end | pass (empty page, correct shape) |
+| `finish` twice | pass (idempotent 200) |
+| late event after finish | **409 Conflict** (correct: finished runs are immutable) |
+| WebSocket hello + live event push | pass on `/v1/live/runs/{id}` |
+| SDK examples against the container (`plain_sdk` and `Necto.from_env`) | pass, runs created |
 
-**Verified:** `dev.ps1 -CheckOnly` under Windows PowerShell 5.1; a full smoke run on `-ApiPort 8001 -WebPort 5174 -NoDb -NoSeed` brought both servers up in ~4 s (healthz 200, Vite ready), and the process tree shut down cleanly with the ports released. `reset.py --yes --seed 6` deleted 142 events / 6 runs / 4 agents / 2 models and re-seeded 6 demo runs (API confirmed `X-Total-Count: 6`).
+**Two false alarms, both probe bugs** (not product bugs): `X-Total-Count` "missing" because
+urllib lowercases header keys; WebSocket **403** because the probe used the old `/v1/live?run_id=`
+path instead of `/v1/live/runs/{id}`. The 403 also proved unknown WS routes are rejected before
+the handler. Probe runs were deleted afterwards (dev DB back to the 6 seeded runs).
 
-**Two issues found:**
+### Phase 5 files
 
-- `pwsh` (PowerShell 7) is not installed on this machine; the script is written for Windows PowerShell 5.1 as well.
-- PowerShell 5.1 reads BOM-less files as ANSI, so the em dashes in a thrown message broke parsing. The script is now pure ASCII, and `pwsh`'s own help text avoids non-ASCII.
+| File | Purpose |
+|---|---|
+| `.github/workflows/ci.yml` | 5 jobs: server (Postgres 16 service, migrations, pytest), sdk (with framework extras, real LangGraph), web (frozen install, vitest, build), lint (`uvx ruff check/format`), docker (image builds) |
+| `.github/workflows/publish-sdk.yml` | release-triggered wheel + sdist to PyPI via **trusted publishing** (OIDC, no secrets) |
+| `.github/dependabot.yml` | weekly uv (server + sdk), npm, docker, actions updates |
+| `.github/ISSUE_TEMPLATE/*` | bug report + feature request forms |
+| `CONTRIBUTING.md` | setup, tests, schema rules, review expectations |
+| `SECURITY.md` | private reporting + deployment notes (no auth by default, prompts are sensitive) |
+| `CHANGELOG.md` | 0.1.0 feature summary |
+| `docs/RELEASE.md` | exact release checklist, including the one-time manual steps |
+
+**Validated locally:** every YAML parses; the CI lint command passes (`uvx ruff check .` — 72 files
+formatted); web tests run with the same command as CI; `docker build -t necto-app:ci .` succeeds.
+
+**Remaining manual (user):** `gh auth login`, add the remote and push, enable private vulnerability
+reporting, configure the PyPI trusted publisher, then create the release tag — all listed in
+`docs/RELEASE.md`.

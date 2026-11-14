@@ -1,21 +1,34 @@
 name: Bug report
-description: Something is broken
+description: Something is wrong with necto.
 labels: [bug]
 body:
   - type: textarea
     id: what
     attributes:
       label: What happened?
-      description: Steps to reproduce, and expected vs actual behavior.
+      description: Include the exact command and the output you saw.
     validations:
       required: true
   - type: textarea
-    id: env
+    id: expected
     attributes:
-      label: Environment
-      description: OS, Python version, necto-sdk version, framework (LangGraph / OpenAI Agents / generic), browser.
-  - type: textarea
-    id: logs
+      label: What did you expect?
+    validations:
+      required: true
+  - type: input
+    id: version
     attributes:
-      label: Logs / screenshots
-      description: Anything that helps — a screenshot of the graph view is worth a thousand words.
+      label: Version / commit
+      placeholder: e.g. v0.1.0 or the commit hash
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - server / API
+        - python SDK
+        - web UI
+        - docker / self-host
+        - docs
+    validations:
+      required: true

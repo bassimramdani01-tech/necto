@@ -1,0 +1,30 @@
+name: publish SDK
+
+# Publishing happens on a GitHub release, via PyPI Trusted Publishing (no tokens in secrets).
+# One-time setup: on pypi.org add a trusted publisher for this repository with
+#   workflow: publish-sdk.yml  ·  environment: pypi
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pypi:
+    name: build and publish necto-sdk
+    runs-on: ubuntu-latest
+    environment: pypi
+    defaults:
+      run:
+        working-directory: sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build wheel and sdist
+        run: uv build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdk/dist
