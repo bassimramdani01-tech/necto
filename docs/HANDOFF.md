@@ -1038,6 +1038,9 @@ Also: `NectoCallbackHandler.last_run_id` / `NectoProcessor.last_run_id` are now 
 
 ---
 
+
+---
+
 ## 32. Debugging session + Phase 5 start (CI and release rails)
 
 ### Debugging session
@@ -1079,3 +1082,29 @@ formatted); web tests run with the same command as CI; `docker build -t necto-ap
 **Remaining manual (user):** `gh auth login`, add the remote and push, enable private vulnerability
 reporting, configure the PyPI trusted publisher, then create the release tag — all listed in
 `docs/RELEASE.md`.
+
+---
+
+## 33. Debugging session #2 - can a stranger use and deploy this?
+
+Method: a **pristine `git clone`** into a temp directory (only committed files, no local caches),
+then the README path end to end.
+
+| Check | Result |
+|---|---|
+| Clone has every required file | 144 tracked files, all present; 5 tags |
+| Server: `uv sync --frozen`, migrations, pytest | pass, **84 tests** |
+| SDK: `uv sync`, pytest | pass, **60 passed / 2 skipped** (LangGraph + OTEL extras absent; CI installs them -> 61/1) |
+| Web: `pnpm install --frozen-lockfile`, vitest, build | pass, **31 tests**, dist built |
+| Deploy: `docker compose up -d --build` | **healthy in ~15 s**, migrations on a fresh volume, 6 demo runs seeded |
+| Endpoints `/healthz`, `/docs`, `/`, `/v1/runs`, `/v1/frameworks` | all 200 |
+| UI in the deployed container | renders the seeded dashboard |
+| SDK run against the deployed container (`examples/plain_sdk.py`) | recorded and visible in the UI graph |
+
+**No functional bugs found.** Two docs nits fixed: a machine-specific path left in this file (an
+old command example) and the examples' printed UI link assuming the dev server on `:5173` (now
+documented to pass `--ui http://localhost:8000` when deployed).
+
+**Added:** `docs/COPILOT_PUSH_PROMPT.md`, a guarded command prompt for GitHub Copilot that
+re-runs the preflight, creates the repo, pushes, triages CI, enables private vulnerability
+reporting, and stops for the human before PyPI.
