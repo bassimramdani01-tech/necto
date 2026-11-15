@@ -7,6 +7,7 @@ tools, and it renders the whole thing as one interactive network graph — so yo
 actually works, instead of piecing it together from logs.
 
 ![tests](https://img.shields.io/badge/tests-179%20passing-brightgreen)
+![CI](https://github.com/bassimramdani01-tech/necto/actions/workflows/ci.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![node](https://img.shields.io/badge/node-20%2B-yellow)
 ![license](https://img.shields.io/badge/license-MIT-green)
